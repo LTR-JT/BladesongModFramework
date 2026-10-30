@@ -1,4 +1,4 @@
-import hashlib,json,pathlib,shutil,subprocess,tempfile,unittest,zipfile,os
+import hashlib,json,pathlib,shutil,subprocess,tempfile,unittest,zipfile,os,time
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 SERVICE=ROOT/'Framework/BladesongModFramework/Scripts/bmf-worker.exe'
 class Installer(unittest.TestCase):
@@ -6,7 +6,15 @@ class Installer(unittest.TestCase):
   self.tmp=tempfile.TemporaryDirectory(dir=ROOT/'Tests');self.root=pathlib.Path(self.tmp.name).resolve();assert self.root.is_relative_to((ROOT/'Tests').resolve())
   self.scripts=self.root/'Bladesong/Binaries/Win64/ue4ss/Mods/BladesongModFramework/Scripts';self.scripts.mkdir(parents=True)
   shutil.copyfile(SERVICE,self.scripts/'bmf-worker.exe');self.sequence=0
- def tearDown(self):self.tmp.cleanup()
+ def tearDown(self):
+  # The background helper writes its result just before exiting. Windows may
+  # retain its executable mapping briefly after the result becomes visible.
+  deadline=time.monotonic()+5
+  while True:
+   try:self.tmp.cleanup();return
+   except PermissionError:
+    if time.monotonic()>=deadline:raise
+    time.sleep(.05)
  def job(self,op,args,capabilities=None):
   self.sequence+=1;job=self.root/f'job{self.sequence}.json';job.write_text(json.dumps({'id':f'test_{self.sequence}','operation':op,'args':args,'capabilities':capabilities or []}),encoding='utf8')
   run=subprocess.run([str(self.scripts/'bmf-worker.exe'),str(job)],capture_output=True,text=True,timeout=30)
