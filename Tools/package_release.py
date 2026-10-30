@@ -22,6 +22,10 @@ with tempfile.TemporaryDirectory(dir=ROOT/'Build')as temp:
 release['repository']='https://github.com/LTR-JT/BladesongModFramework'
 release['download']={'url':f'https://github.com/LTR-JT/BladesongModFramework/releases/download/v{version}/{bmf.name}','sha256':hashlib.sha256(bmf.read_bytes()).hexdigest()}
 (OUT/'mod.json').write_text(json.dumps(release,indent=2)+'\n',encoding='utf-8')
+# Give manual/easy installs the same checked ownership receipt as in-game installs.
+# Shared paths are resolved by the updater's existing framework-only Target mapping.
+with zipfile.ZipFile(manual,'a',zipfile.ZIP_DEFLATED)as z:
+ z.writestr('Bladesong/Binaries/Win64/ue4ss/Mods/BladesongModFramework/bmf-installed.json',json.dumps(release,indent=2)+'\n')
 archives=[manual,bmf]
 for archive in archives:
  with zipfile.ZipFile(archive)as z:assert z.testzip()is None

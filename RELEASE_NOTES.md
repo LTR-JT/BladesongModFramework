@@ -1,15 +1,19 @@
-Bladesong Mod Framework 0.1.5
+Bladesong Mod Framework 0.1.6
 
-For the easiest installation, download **BladesongModFramework_0.1.5_Easy_Install_With_UE4SS.zip**.
-Close the game, Extract All, open the folder and double-click INSTALL.cmd. Press Enter, then start Bladesong and choose Mods above Options.
+Download **BladesongModFramework_0.1.6_Easy_Install_With_UE4SS.zip** for a new installation. Close Bladesong, Extract All, open the folder and double-click INSTALL.cmd. UE4SS is included and its debug windows are disabled.
 
-- Includes the mod manager and the configured UE4SS runtime; debug windows are disabled.
-- Automatically finds the Steam game folder and backs up replaced files.
-- Browse loads the community catalogue and provides Install and confirmation controls.
-- Background jobs launch directly without Command Prompt windows.
-- Creative/Story tabs, menu layout, search, Forge Blade and multi-delete belong to the framework and remain available without PCL.
-- PCL 15.18.2 registers its library with that shared menu.
+- Browse displays cached or bundled entries immediately; network refresh runs in the background.
+- Installation and repository URLs are part of Browse. There is no separate Install tab.
+- Updates are checked at startup and shown with Update controls on Installed mod cards. There is no separate Updates tab.
+- Deferred native button actions run on the next frame instead of waiting for the half-second monitor interval.
+- Creative PCL tabs reuse library models and thumbnails. Preview decoding is progressive, outside the tab click callback; repeated binding events no longer repeatedly rebuild the card controls.
+- Index/name changes and invalid game objects invalidate the cache.
+- Manual and easy installs include ownership receipts for future in-game updates.
 
-Runtime.zip is for manual installation with existing compatible UE4SS. BMF.zip is for the in-game updater.
+PCL 15.18.2 remains compatible. First-time network requests and uncached thumbnails still need time; cached content can be used while that work finishes.
 
-0.1.5 also recognizes dependencies installed by copying files or using the easy installer, without requiring a previous in-game installation receipt.
+- Browse shows a checkmark and Installed text for existing mods.
+- The catalogue URL is hidden; the dark, gold-text Install from URL field is at the top of Browse.
+- Creative mode has a bottom-right Close control using the native Main Menu action.
+
+- Install and Update are one click: validate, download, enable and restart/apply automatically. Local-edit and staged-file checks run before requesting game exit.

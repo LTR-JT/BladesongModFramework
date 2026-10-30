@@ -1,37 +1,43 @@
 local root=os.getenv('BMF_TEST_ROOT')or 'BladesongModdingPlatform'
-local M,F,text=assert(loadfile(root..'/Tests/manager_open.lua'))()
+local M,F,text,obj=assert(loadfile(root..'/Tests/manager_open.lua'))()
 local jobs,settings={},{}
 function F.GetSettings()return {registry_url=''}end
-function F.SetSetting(id,key,value)assert(type(value)=='string','FString escaped UI conversion');settings[key]=value end
+function F.SetSetting(_,key,value)assert(type(value)=='string');settings[key]=value end
 function F.StartJob(operation,args,callback)jobs[#jobs+1]={operation=operation,args=args,callback=callback}end
 function text:Conv_TextToString(value)return {ToString=function()return value end}end
-M.Open();M.page='browse';M.Render()
-assert(#jobs==1 and jobs[1].operation=='browse')
-assert(jobs[1].args.index_url==M.default_index and settings.registry_url==M.default_index)
-jobs[1].callback({status='complete',entries={{name='Preconstruction Library',repository='https://github.com/LTR-JT/PreconstructionLibrary',manifest={name='Preconstruction Library',version='15.18.2'}}}})
-assert(not M.busy and #M.browser==1 and #jobs==1)
-local install
-for _,action in pairs(M.actions)do if action.widget.caption=='Install'then install=action end end
-assert(install,'Browse entry has no Install button');install.callback()
-assert(M.page=='browse'and jobs[#jobs].operation=='inspect','Browse install left the catalogue')
-jobs[#jobs].callback({status='complete',mod={id='PreconstructionLibraryProbe',name='Preconstruction Library',version='15.18.2',source='https://example.org/mod.json',manifest_sha256='fixture'}})
-local confirm
-for _,action in pairs(M.actions)do if action.widget.caption=='Confirm install'then confirm=action end end
-assert(confirm,'Reviewed release has no confirmation button')
-confirm.callback();assert(jobs[#jobs].operation=='stage');jobs[#jobs].callback({status='complete',message='Staged'})
-local restart
-for _,entry in pairs(M.actions)do if entry.widget.caption=='Restart & Apply'then restart=entry end end
-assert(restart,'Staged browse installation has no apply control');restart.callback()
-local confirmation
-for _,entry in pairs(M.actions)do if entry.widget.caption=='Confirm saved - restart and apply'then confirmation=entry end end
-assert(confirmation,'Apply requires explicit saved-game confirmation')
-jobs={}
-M.registry:SetText('https://example.org/index.json')
-for _,action in pairs(M.actions)do if action.widget.caption=='Refresh catalogue'then action.callback();break end end
-assert(#jobs==1 and jobs[1].args.index_url=='https://example.org/index.json')
-jobs[1].callback({status='failed',error='Offline'})
-M.page='install';M.Render();M.url:SetText('https://github.com/LTR-JT/PreconstructionLibrary')
-for _,action in pairs(M.actions)do if action.widget.caption=='Inspect URL'then action.callback();break end end
-assert(#jobs==2 and type(jobs[2].args.url)=='string')
-M.Close()
-print('PASS: blank index migrates to hosted default, Browse auto-loads once, FString URL becomes Lua string, offline errors stop retries, install URL stays serializable')
+M.Open();assert(table.concat(M.tabs._labels,',')=='Installed,Browse,Settings,Developer')
+M.PrimeCatalogue();assert(#M.browser>0 and #jobs==0,'Catalogue waited for network')
+M.page='browse';M.Render();assert(#jobs==1 and jobs[1].operation=='browse'and not M.busy)
+assert(jobs[1].args.index_url==M.default_index)
+jobs[1].callback({status='complete',entries={{name='Preconstruction Library',repository='https://github.com/LTR-JT/PreconstructionLibrary',manifest={id='PreconstructionLibraryProbe',name='PCL',version='15.18.2'}}}})
+local function action(caption)
+ for _,entry in pairs(M.actions)do if entry.widget.caption==caption then return entry end end
+ error('Missing action '..caption)
+end
+local before=M.panel;action('Install').callback()
+assert(#jobs==2 and jobs[2].operation=='install'and jobs[2].args.expected_id=='PreconstructionLibraryProbe')
+assert(M.quit_after_job and M.busy)
+jobs[2].callback({status='failed',error='Offline'});assert(M.panel==before and not M.quit_after_job and not M.busy)
+assert(M.registry==nil,'Fixed catalogue URL is editable')
+action('Refresh catalogue').callback();assert(jobs[#jobs].args.force==true)
+jobs[#jobs].callback({status='failed',error='Offline'})
+M.url:SetText('https://github.com/LTR-JT/PreconstructionLibrary');action('Install from URL').callback()
+assert(jobs[#jobs].operation=='install'and type(jobs[#jobs].args.url)=='string')
+jobs[#jobs].callback({status='failed',error='Offline'})
+M.page='installed';M.Render();action('Check for updates').callback();local count=#jobs;M.CheckUpdates();assert(#jobs==count)
+jobs[#jobs].callback({status='complete',updates={{id='Example',name='Example mod',version='1.1.0',source='https://example.org/update.json'}}})
+action('Update to 1.1.0').callback();assert(M.page=='installed'and jobs[#jobs].operation=='install')
+local quit=0;local find=StaticFindObject
+StaticFindObject=function(path)
+ if path:find('KismetSystemLibrary',1,true)then local library=obj('Library');library.QuitGame=function()quit=quit+1 end;return library end
+ return find(path)
+end
+jobs[#jobs].callback({status='waiting_for_exit'});assert(quit==1,'Successful install did not request normal game exit')
+StaticFindObject=find
+local registered=F.GetRegisteredMods
+F.GetRegisteredMods=function()return {{id='PreconstructionLibraryProbe',name='PCL',repository='https://github.com/LTR-JT/PreconstructionLibrary',enabled=false}}end
+M.busy=false;M.page='browse';M.Render()
+for _,entry in pairs(M.actions)do assert(entry.widget.caption~='Install'and entry.widget.caption~='Confirm install','Extra/installed install button remains')end
+assert(M.url.WidgetStyle.BackgroundImageNormal.DrawAs==0)
+F.GetRegisteredMods=registered;M.Close()
+print('PASS: cached catalogue appears before network; merged tabs; installed badge; one-click install/URL/update; failure stays open; only successful preparation requests exit')

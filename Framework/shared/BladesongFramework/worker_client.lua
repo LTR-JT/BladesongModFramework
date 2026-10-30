@@ -14,6 +14,14 @@ function C.StartJob(operation,args,callback)
  local arguments={#bytes};for i=1,#bytes do arguments[#arguments+1]=bytes:byte(i)end
  assert(C.launch(table.unpack(arguments))>0,'Could not launch the background worker')
  C.jobs[id]={path=path,callback=callback,started=os.time()}
+ if not C.polling and type(ExecuteInGameThreadWithDelay)=='function'then
+  C.polling=true
+  local function poll()
+   C.Poll()
+   if next(C.jobs)then ExecuteInGameThreadWithDelay(50,poll)else C.polling=false end
+  end
+  ExecuteInGameThreadWithDelay(50,poll)
+ end
  return id
 end
 function C.Poll()

@@ -1,7 +1,7 @@
 # Install the Mod Manager
 
 1. Close Bladesong.
-2. Download **BladesongModFramework_0.1.5_Easy_Install_With_UE4SS.zip** from [Releases](https://github.com/LTR-JT/BladesongModFramework/releases/latest).
+2. Download **BladesongModFramework_0.1.6_Easy_Install_With_UE4SS.zip** from [Releases](https://github.com/LTR-JT/BladesongModFramework/releases/latest).
 3. Right-click the ZIP and choose **Extract All**.
 4. Open the extracted folder and double-click **INSTALL.cmd**.
 5. Press **Enter** to install, then start the game.
@@ -12,8 +12,7 @@ UE4SS is included. You do not need to install it separately.
 If the installer asks for the game folder, open Steam, right-click Bladesong,
 then choose **Manage > Browse local files**. Select that folder in the installer.
 
-Browse loads the community mod list automatically. Each mod is reviewed before
-installation. Your saves, PCL library and other mods are not deleted. Replaced
+Browse loads the community mod list automatically. Install checks the package and restarts Bladesong to apply it. Your saves, PCL library and other mods are not deleted. Replaced
 files are backed up in **BMF_Backups** inside the game folder.
 
 ## Copy files manually instead
@@ -23,3 +22,5 @@ Choose **Replace** when asked. Keep existing saves and the Mods folder.
 
 The small Runtime ZIP is for people who already have compatible UE4SS.
 The BMF ZIP is for the in-game updater. GitHub's Source code ZIP is for developers.
+
+Use **Browse** to install a catalogue mod or a repository URL. Available updates appear beside their mods on **Installed** after the automatic startup check.

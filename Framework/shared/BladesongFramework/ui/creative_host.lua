@@ -5,11 +5,7 @@ local E=environment or setmetatable({},{__index=_G})
 E.BMF_CREATIVE_FRAMEWORK=F;
 if options.provider then
  local client=assert(loadfile(root..'worker_client.lua'))(root,F)
- E.BMF_CREATIVE_FRAMEWORK=setmetatable({StartJob=function(operation,args,callback)
-  local id=client.StartJob(operation,args,callback)
-  local function poll()client.Poll();if next(client.jobs)then E.pcl15179_schedule(100,poll)end end
-  E.pcl15179_schedule(100,poll);return id
- end},{__index=F})
+ E.BMF_CREATIVE_FRAMEWORK=setmetatable({StartJob=client.StartJob},{__index=F})
 end
 E.BMF_CREATIVE_ROOT=root;E.BMF_CREATIVE_HAS_PROVIDER=options.provider==true
 for key,value in pairs(options)do if key~='provider'then E[key]=value end end

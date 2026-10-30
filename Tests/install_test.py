@@ -57,6 +57,13 @@ class Installer(unittest.TestCase):
   plan=self.scripts.parent/'Data/pending.json';data=json.loads(plan.read_text());data['relaunch']=False;plan.write_text(json.dumps(data))
   result=self.job('apply',{'plan':str(plan)});self.assertEqual(result['status'],'complete',result)
   self.assertFalse((mod/'enabled.txt').exists());self.assertIn(': 0',(mods/'mods.txt').read_text())
+ def test_restart_preflight_rejects_local_edits_before_exit(self):
+  archive,manifest=self.archive();validated=self.validate(archive,manifest);self.assertEqual(validated['status'],'complete')
+  target=self.scripts.parent.parent/'FixtureMod/Scripts/main.lua';target.parent.mkdir(parents=True);target.write_text('personal edit')
+  data=self.scripts.parent/'Data';data.mkdir(exist_ok=True);pending=data/'pending.json'
+  pending.write_text(json.dumps({'schema_version':1,'approved':True,'id':'preflight_fixture','relaunch':False,'items':[{'manifest':str(manifest),'payload':validated['payload']}]}))
+  result=self.job('restart',{});self.assertEqual(result['status'],'failed');self.assertIn('Unmanaged installation',result['error'])
+  self.assertEqual(target.read_text(),'personal edit');self.assertEqual(list(data.glob('apply-*.exe')),[])
  def test_failure_rolls_back_prior_write(self):
   p,m=self.archive();manifest=json.loads(m.read_text());data=b'second';manifest['files'].append({'path':'blocked/second.lua','size':len(data),'sha256':hashlib.sha256(data).hexdigest()})
   m.write_text(json.dumps(manifest))
@@ -93,6 +100,16 @@ class Installer(unittest.TestCase):
   self.assertEqual(len(result['entries']),2);entries={x['repository']:x for x in result['entries']}
   self.assertEqual(entries[repos[0]]['manifest']['name'],'Author supplied name');self.assertTrue(entries[repos[0]]['cached'])
   self.assertEqual(entries[repos[1]]['status'],'unavailable')
+ def test_fresh_catalogue_avoids_network(self):
+  import time
+  url='https://invalid.invalid/index.json';repository='https://github.com/example/cached'
+  cache=self.scripts.parent/'Data/catalogue';cache.mkdir(parents=True)
+  key=lambda value:hashlib.sha256(value.encode()).hexdigest()
+  (cache/(key(url)+'.index.json')).write_text(json.dumps({'mods':[{'name':'Cached','url':repository}]}))
+  (cache/(key(repository)+'.mod.json')).write_text(json.dumps({'schema_version':1,'id':'Cached','name':'Cached','version':'1.0.0','api':'^1.0.0'}))
+  started=time.perf_counter();result=self.job('browse',{'index_url':url});elapsed=time.perf_counter()-started
+  self.assertEqual(result['status'],'complete',result);self.assertTrue(result['cached_index']);self.assertFalse('Using cached index' in result['message']);self.assertEqual(result['entries'][0]['manifest']['id'],'Cached')
+  print('Cached catalogue worker: %.0f ms (no network)'%(elapsed*1000))
  def test_automatic_manifest_and_ordinary_discovery(self):
   mods=self.scripts.parent.parent
   for name in ['Ordinary','Declared','Broken']:(mods/name/'Scripts').mkdir(parents=True);(mods/name/'Scripts/main.lua').write_text('')

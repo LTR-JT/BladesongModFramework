@@ -62,7 +62,7 @@ class Worker {
  static void Fetch(string url,string path,long limit=67108864,int timeout=30000){
   Uri u=Https(url);ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
   for(int hop=0;hop<6;hop++){
-   var r=(HttpWebRequest)WebRequest.Create(u);r.AllowAutoRedirect=false;r.UserAgent="BladesongModFramework/0.1.5";r.Timeout=timeout;r.ReadWriteTimeout=timeout;
+   var r=(HttpWebRequest)WebRequest.Create(u);r.AllowAutoRedirect=false;r.UserAgent="BladesongModFramework/0.1.6";r.Timeout=timeout;r.ReadWriteTimeout=timeout;
    string rate=Path.Combine(Data,"rate-"+TextHash(u.Host)+".json");lock(NetworkSync){if(File.Exists(rate)){DateTime until;if(DateTime.TryParse(S(Read(rate),"until"),out until)&&until.ToUniversalTime()>DateTime.UtcNow)throw new Exception("Provider rate limit cooldown; using cached metadata where available");}}
    HttpWebResponse received;try{received=(HttpWebResponse)r.GetResponse();}catch(WebException e){var failed=e.Response as HttpWebResponse;if(failed!=null){using(failed){if((int)failed.StatusCode==429||((int)failed.StatusCode==403&&(failed.Headers["X-RateLimit-Remaining"]=="0"||failed.Headers["Retry-After"]!=null))){int seconds;long reset;DateTime until=DateTime.UtcNow.AddMinutes(15);if(Int32.TryParse(failed.Headers["Retry-After"],out seconds))until=DateTime.UtcNow.AddSeconds(Math.Min(86400,Math.Max(1,seconds)));else if(Int64.TryParse(failed.Headers["X-RateLimit-Reset"],out reset))until=new DateTime(1970,1,1,0,0,0,DateTimeKind.Utc).AddSeconds(reset);lock(NetworkSync)Write(rate,Obj("until",until.ToString("o")));throw new Exception("Provider rate limit reached; cached metadata remains available");}}}throw;}
    using(var response=received){
@@ -105,17 +105,17 @@ class Worker {
   return m;
  }
  static object Browse(object args,string work){
-  bool offline=Convert.ToBoolean(G(args,"offline",false));
-  string url=S(args,"index_url");Https(url);string cache=Path.Combine(Data,"catalogue");Directory.CreateDirectory(cache);string cachedIndex=Path.Combine(cache,TextHash(url)+".index.json");object index;bool stale=false;
-  try{if(offline)throw new Exception("Offline mode");string file=Path.Combine(work,"index.json");Fetch(url,file,262144,8000);index=Read(file);Index(index);Write(cachedIndex,index);}catch{if(!File.Exists(cachedIndex))throw;index=Read(cachedIndex);Index(index);stale=true;}
+  bool offline=Convert.ToBoolean(G(args,"offline",false)),force=Convert.ToBoolean(G(args,"force",false));
+  string url=S(args,"index_url");Https(url);string cache=Path.Combine(Data,"catalogue");Directory.CreateDirectory(cache);string cachedIndex=Path.Combine(cache,TextHash(url)+".index.json");object index;bool stale=false,cachedIndexUsed=false;
+  try{if(offline)throw new Exception("Offline mode");if(!force&&File.Exists(cachedIndex)&&DateTime.UtcNow-File.GetLastWriteTimeUtc(cachedIndex)<TimeSpan.FromMinutes(10)){index=Read(cachedIndex);Index(index);cachedIndexUsed=true;}else{string file=Path.Combine(work,"index.json");Fetch(url,file,262144,8000);index=Read(file);Index(index);Write(cachedIndex,index);}}catch{if(!File.Exists(cachedIndex))throw;index=Read(cachedIndex);Index(index);stale=true;cachedIndexUsed=true;}
   var entries=new List<object>();var sync=new object();using(var cancel=new CancellationTokenSource()){
    cancel.CancelAfter(45000);try{Parallel.ForEach(A(G(index,"mods")),new ParallelOptions{MaxDegreeOfParallelism=4,CancellationToken=cancel.Token},entry=>{
     string repository=S(entry,"url"),cached=Path.Combine(cache,TextHash(repository)+".mod.json");object metadata=null;string error="";bool cachedResult=false;
-    try{if(offline&&!File.Exists(cached))throw new Exception("Repository metadata unavailable offline");if(File.Exists(cached)&&(offline||DateTime.UtcNow-File.GetLastWriteTimeUtc(cached)<TimeSpan.FromHours(1))){metadata=Read(cached);cachedResult=true;}else{string dir=Child(work,TextHash(repository));Directory.CreateDirectory(dir);metadata=RepoMetadata(repository,dir);Write(cached,metadata);}}
+    try{if(offline&&!File.Exists(cached))throw new Exception("Repository metadata unavailable offline");if(File.Exists(cached)&&(offline||(!force&&DateTime.UtcNow-File.GetLastWriteTimeUtc(cached)<TimeSpan.FromHours(1)))){metadata=Read(cached);cachedResult=true;}else{string dir=Child(work,TextHash(repository));Directory.CreateDirectory(dir);metadata=RepoMetadata(repository,dir);Write(cached,metadata);}}
     catch(Exception e){error=e.Message;if(File.Exists(cached)){try{metadata=Read(cached);cachedResult=true;}catch{}}}
     lock(sync)entries.Add(Obj("name",S(entry,"name"),"repository",repository,"manifest",metadata,"cached",cachedResult,"error",error,"status",metadata==null?"unavailable":"available"));
    });}catch(OperationCanceledException){}}
-  return Obj("status","complete","entries",entries.OrderBy(e=>S(e,"name")).ToArray(),"message",stale?"Using cached index; unavailable repositories do not block other mods.":"Repository metadata loaded. The selected release manifest is authoritative when reviewing an install.");
+  return Obj("status","complete","entries",entries.OrderBy(e=>S(e,"name")).ToArray(),"cached_index",cachedIndexUsed,"message",stale?"Using cached index; unavailable repositories do not block other mods.":"Repository metadata loaded. The selected release manifest is authoritative when reviewing an install.");
  }
  static bool GIsArray(object x){return x is object[]||x is ArrayList;}
  static string Compatibility(object m,object request){
@@ -150,7 +150,13 @@ class Worker {
    var branch=Regex.Match(raw,"\"BetaKey\"\\s+\"([^\"\\r\\n]+)\"");if(branch.Success){string beta=branch.Groups[1].Value;if(beta=="public")result["branch"]="main";else if(beta=="bleedingedge")result["branch"]="bleedingedge";}
   }Write(Path.Combine(Data,"identity.json"),result);return result;
  }
- static IEnumerable<string> Records(){return Directory.GetDirectories(ModsRoot).Select(d=>Path.Combine(d,"bmf-installed.json")).Where(File.Exists);}
+ static IEnumerable<string> Records(){
+  foreach(string directory in Directory.GetDirectories(ModsRoot)){
+   string id=Path.GetFileName(directory);if(!Regex.IsMatch(id,@"^[A-Za-z0-9_-]{1,64}$")||id=="shared")continue;
+   string record=new[]{"mod.json","bmf-manifest.json","bmf-installed.json"}.Select(n=>Child(directory,n)).FirstOrDefault(File.Exists);
+   if(record==null)continue;try{object metadata=Read(record);Metadata(metadata);if(S(metadata,"id")!=id)continue;}catch{continue;}yield return record;
+  }
+ }
  static void Dependencies(object manifest){
   if(G(manifest,"dependencies")==null)return;
   foreach(var dependency in D(G(manifest,"dependencies"))){
@@ -162,10 +168,30 @@ class Worker {
    Need(Enabled(dependency.Key),"Disabled dependency "+dependency.Key);
   }
  }
+ static void CheckTargets(object manifest){
+  string record=Child(ModsRoot,S(manifest,"id")+"/bmf-installed.json");object previous=File.Exists(record)?Read(record):null;
+  foreach(var file in A(G(manifest,"files"))){
+   string destination=Target(manifest,S(file,"path"));if(!File.Exists(destination))continue;
+   Need(previous!=null,"Unmanaged installation exists; manual migration required");
+   var owned=A(G(previous,"files")).FirstOrDefault(x=>S(x,"path")==S(file,"path"));
+   Need(owned!=null&&Hash(destination)==S(owned,"sha256").ToLowerInvariant(),"Local edits preserved; refusing overwrite");
+  }
+ }
+ static object Restart(){
+  string pending=Path.Combine(Data,"pending.json");Need(File.Exists(pending)&&Convert.ToBoolean(G(Read(pending),"approved",false)),"No approved pending changes");
+  object plan=Read(pending);
+  foreach(var item in A(G(plan,"items"))){object manifest=Read(S(item,"manifest"));Manifest(manifest);CheckTargets(manifest);
+   foreach(var file in A(G(manifest,"files")))Need(Hash(Child(S(item,"payload"),S(file,"path")))==S(file,"sha256").ToLowerInvariant(),"Staged file changed");
+  }
+  foreach(var toggle in A(G(plan,"toggles"))){string mods=Path.Combine(ModsRoot,"mods.txt");Need((File.Exists(mods)?Hash(mods):"")==S(toggle,"mods_hash"),"Load order changed since approval");}
+  string copy=Path.Combine(Data,"apply-"+Guid.NewGuid().ToString("N")+".exe");File.Copy(Process.GetCurrentProcess().MainModule.FileName,copy,false);
+  string job=Path.Combine(Data,"apply-job-"+Guid.NewGuid().ToString("N")+".json");Write(job,Obj("id","apply_"+Guid.NewGuid().ToString("N"),"operation","apply","args",Obj("plan",pending),"framework_root",ModRoot));
+  Process.Start(new ProcessStartInfo(copy,"\""+job+"\""){UseShellExecute=false,CreateNoWindow=true});return Obj("status","waiting_for_exit","message","Installation checked. Restarting Bladesong...");
+ }
  static void Stage(Source s,object args,object request,string work){
   object m=s.Manifest;Need(S(m,"id")==S(args,"expected_id")&&S(m,"version")==S(args,"expected_version"),"Source changed since review");
   if(S(args,"expected_manifest_sha256")!="")Need(S(args,"expected_manifest_sha256")==s.Digest,"Manifest changed since review");string compatible=Compatibility(m,request);Need(compatible=="framework-ready","Required API/capability or explicit raw integration support is unavailable: "+compatible);
-  Dependencies(m);
+  Dependencies(m);CheckTargets(m);
   if(s.Archive==null){s.Archive=Path.Combine(work,"archive.zip");Fetch(S(G(m,"download"),"url"),s.Archive);Need(Hash(s.Archive)==S(G(m,"download"),"sha256").ToLowerInvariant(),"Archive hash mismatch");}
   string payload=StageArchive(s.Archive,m,work),manifest=Path.Combine(work,"manifest.json");Write(manifest,m);string pending=Path.Combine(Data,"pending.json");
   var plan=File.Exists(pending)?D(Read(pending)):Obj("schema_version",1,"id",Path.GetFileName(work),"approved",true,"relaunch",true,"items",new object[0]);
@@ -247,16 +273,20 @@ class Worker {
    }
    case "identify":return Obj("status","complete","identity",Identity());
    case "inspect":{Source s=Resolve(S(args,"url"),work);var m=D(s.Manifest);m["source"]=s.Url;m["manifest_sha256"]=s.Digest;m["compatibility"]=Compatibility(m,request);return Obj("status","complete","mod",m);}
+   case "install":{
+    Source source=Resolve(S(args,"url"),work);string expected=S(args,"expected_id");Need(expected==""||S(source.Manifest,"id")==expected,"Release identity differs from the selected mod");
+    Stage(source,Obj("expected_id",S(source.Manifest,"id"),"expected_version",S(source.Manifest,"version"),"expected_manifest_sha256",source.Digest),request,work);
+    if(S(source.Manifest,"id")!="BladesongModFramework"){
+     string pending=Path.Combine(Data,"pending.json"),mods=Path.Combine(ModsRoot,"mods.txt"),id=S(source.Manifest,"id");var plan=D(Read(pending));
+     var toggles=A(G(plan,"toggles")).Where(x=>S(x,"id")!=id).ToList();toggles.Add(Obj("id",id,"enabled",true,"mods_hash",File.Exists(mods)?Hash(mods):"","marker",File.Exists(Child(ModsRoot,id+"/enabled.txt"))));plan["toggles"]=toggles;Write(pending,plan);
+    }
+    return Restart();
+   }
    case "stage":{Source s=Resolve(S(args,"source"),work);Stage(s,args,request,work);return Obj("status","complete","message","Validated and staged. Restart & Apply to install.");}
    case "updates":{var updates=new List<object>();var errors=new List<string>();foreach(string p in Records()){object old=Read(p);if(S(old,"repository")==""||S(old,"pinned_version")!="")continue;try{string dir=Child(work,S(old,"id"));Directory.CreateDirectory(dir);Source s=Resolve(S(old,"repository"),dir,S(old,"channel")=="prerelease");if(Version.Parse(S(s.Manifest,"version").Split('-')[0])>Version.Parse(S(old,"version").Split('-')[0])){var m=D(s.Manifest);m["source"]=s.Url;m["manifest_sha256"]=s.Digest;m["compatibility"]=Compatibility(m,request);updates.Add(m);}}catch(Exception e){errors.Add(S(old,"id")+": "+e.Message);}}return Obj("status","complete","updates",updates,"message",String.Join("; ",errors));}
    case "settings":Write(Path.Combine(Data,"settings.json"),G(args,"settings",Obj()));return Obj("status","complete","message","Settings saved");
    case "toggle":Toggle(args,work);return Obj("status","complete","message","Enable/disable queued for next launch; loaded code remains active until exit.");
-   case "restart":{
-    string pending=Path.Combine(Data,"pending.json");Need(File.Exists(pending)&&Convert.ToBoolean(G(Read(pending),"approved",false)),"No approved pending changes");
-    string copy=Path.Combine(Data,"apply-"+Guid.NewGuid().ToString("N")+".exe");File.Copy(Process.GetCurrentProcess().MainModule.FileName,copy,false);
-    string job=Path.Combine(Data,"apply-job-"+Guid.NewGuid().ToString("N")+".json");Write(job,Obj("id","apply_"+Guid.NewGuid().ToString("N"),"operation","apply","args",Obj("plan",pending),"framework_root",ModRoot));
-    Process.Start(new ProcessStartInfo(copy,"\""+job+"\""){UseShellExecute=false,CreateNoWindow=true});return Obj("status","waiting_for_exit","message","Waiting for normal game exit");
-   }
+   case "restart":return Restart();
    case "apply":Apply(S(args,"plan"));return Obj("status","complete","message","Approved changes applied");
    case "validate-local":return Obj("status","complete","payload",StageArchive(S(args,"archive"),Read(S(args,"manifest")),work));
    default:throw new Exception("Unsupported operation");

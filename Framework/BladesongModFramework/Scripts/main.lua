@@ -1,4 +1,4 @@
--- Bladesong Mod Framework 0.1.5. All UObject access stays on the game thread.
+-- Bladesong Mod Framework 0.1.6. All UObject access stays on the game thread.
 if BMF_RUNTIME_STARTED then return end
 BMF_RUNTIME_STARTED=true
 BMF_ROOT=debug.getinfo(1,'S').source:gsub('^@',''):match('^(.*[\\/])')..'../../shared/BladesongFramework/'
@@ -13,6 +13,7 @@ BMF.StartJob=BMF_WORKER.StartJob
 BMF_PollJobs=BMF_WORKER.Poll
 print('[BMF] Quiet worker revision 2 active: direct CreateProcessW; shell launches disabled.\n')
 BMF_MANAGER=assert(loadfile(BMF_ROOT..'manager.lua'))(BMF,BMF_ROOT)
+BMF_MANAGER.PrimeCatalogue(BMF_MANAGER.default_index)
 BMF_CREATIVE=assert(loadfile(BMF_ROOT..'ui/creative_host.lua'))(BMF,BMF_ROOT)
 BMF.StartJob('discover',{},function(result)
  for _,metadata in ipairs(result.mods or {})do
@@ -31,11 +32,12 @@ end)
 function BMF_RuntimeTick()
  if BMF._get('epoch')~=BMF_GENERATION then return end
  local ok,err=pcall(function()
-  BMF_PollJobs();BMF.Poll();BMF_MANAGER.Monitor();BMF_CREATIVE.Tick()
+  BMF.Poll();BMF_MANAGER.Monitor();BMF_CREATIVE.Tick()
   local preferences=BMF.GetSettings('BladesongModFramework')
   if preferences.auto_check~=false and (not BMF_LAST_UPDATE_CHECK or os.time()-BMF_LAST_UPDATE_CHECK>=3600)then
-   BMF_LAST_UPDATE_CHECK=os.time();BMF.StartJob('updates',{},function(result)BMF_MANAGER.updates=result.updates or {};if result.status=='failed'then BMF.errors[#BMF.errors+1]=result.error end end)
+   BMF_LAST_UPDATE_CHECK=os.time();BMF_MANAGER.CheckUpdates()
   end
+  if not BMF_MANAGER.browse_requested then BMF_MANAGER.RefreshCatalogue(BMF_MANAGER.default_index,false)end
   local settings=BMF._get('settings')or '{}'
   if settings~=BMF_SAVED_SETTINGS then
    BMF_SAVED_SETTINGS=settings;BMF.StartJob('settings',{settings=BMF._json.decode(settings)},function(result)if result.status=='failed'then BMF.errors[#BMF.errors+1]=result.error end end)
@@ -46,4 +48,4 @@ function BMF_RuntimeTick()
  ExecuteInGameThreadWithDelay(500,BMF_RuntimeTick)
 end
 ExecuteInGameThreadWithDelay(500,BMF_RuntimeTick)
-print('[BMF] Framework 0.1.5 initialized; API 1.0.0; branch identity is unknown until verified.\n')
+print('[BMF] Framework 0.1.6 initialized; API 1.0.0; branch identity is unknown until verified.\n')

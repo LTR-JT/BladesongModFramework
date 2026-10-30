@@ -3,7 +3,7 @@ local TEST_ROOT=os.getenv('BMF_TEST_ROOT')or 'BladesongModdingPlatform'
 local serial=0
 local function obj(kind,name)
  serial=serial+1
- local w={kind=kind,name=name or kind,id=serial,children={},Font={Size=24}}
+ local w={kind=kind,name=name or kind,id=serial,children={},Font={Size=24},WidgetStyle={Padding={},TextStyle={Font={}},BackgroundImageNormal={},BackgroundImageHovered={},BackgroundImageFocused={},BackgroundImageReadOnly={}}}
  function w:IsValid()return true end
  function w:GetAddress()return self.id end
  function w:GetFName()return {ToString=function()return self.name end}end
@@ -31,7 +31,7 @@ local function obj(kind,name)
  function w:GetText()return self.text end
  function w:SetHintText(v)self.hint=v end
  function w:SetCaption(v)self.caption=v end
- for _,method in ipairs({'SetStyle','SetMinDimensions','SetToolTipText','SetFont','SetAutoWrapText','SetVisibility','SetColorAndOpacity','SetWidthOverride','SetMaxDesiredWidth','SetHeightOverride','SetBrushColor','SetPadding'})do w[method]=function()end end
+ for _,method in ipairs({'SetForegroundColor','SetStyle','SetMinDimensions','SetToolTipText','SetFont','SetAutoWrapText','SetVisibility','SetColorAndOpacity','SetWidthOverride','SetMaxDesiredWidth','SetHeightOverride','SetBrushColor','SetPadding'})do w[method]=function()end end
  function w:AddToViewport()error('Must use native menu switcher, not a viewport overlay')end
  return w
 end
@@ -57,7 +57,7 @@ local click_hook
 function RegisterHook(path,callback)if path:find('HandleButtonClicked',1,true)then click_hook=callback end end
 local original_loadfile=loadfile
 function loadfile(path,...)
- if path:match('ui/primitives.lua$')then return function()return {tab=function()end,update=function()end}end end
+ if path:match('ui/primitives.lua$')then return function()local labels={};return {_labels=labels,tab=function(_,_,caption)labels[#labels+1]=caption end,update=function()end}end end
  return original_loadfile(path,...)
 end
 local native=obj('NativeMainPage');local switcher=obj('WidgetSwitcher');switcher.active=native
@@ -65,7 +65,7 @@ function switcher:GetActiveWidget()return self.active end
 function switcher:IsCurrentlySwitching()return self.switching or false end
 function switcher:IsTransitionPlaying()return self.animating or false end
 function switcher:SetActiveWidget(w)self.active=w end
-local F={_valid=function(w)return type(w)=='table'and type(w.IsValid)=='function'and w:IsValid()end,errors={}}
+local F={_json=assert(original_loadfile(TEST_ROOT..'/Framework/shared/BladesongFramework/json.lua'))(),_valid=function(w)return type(w)=='table'and type(w.IsValid)=='function'and w:IsValid()end,errors={}}
 function F.GetRegisteredMods()return {{id='Example',name='Example mod',version='1.0.0',description='Example description',status='registered',enabled=true},{id='ConsoleCommandsMod',name='Console commands',version='0.0.0',discovered=true}}end
 local M=assert(loadfile(TEST_ROOT..'/Framework/shared/BladesongFramework/manager.lua'))(F,TEST_ROOT..'/Framework/shared/BladesongFramework/')
 M.main=obj('Main');M.main.QuitButton=obj('Button');M.main.VersionText=obj('TextBlock');M.main.WidgetSwitcher=switcher

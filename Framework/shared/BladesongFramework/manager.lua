@@ -21,11 +21,46 @@ local function plain(value)
  return result
 end
 
-function M.RefreshCatalogue(url)
+function M.PrimeCatalogue(url)
+ url=url or M.default_index
+ if M.browser_url==url then return end
+ M.browser_url=url;M.browser={}
+ local file=io.open(root..'../../BladesongModFramework/Data/catalogue-view.json','rb')
+ if file then local wire=file:read('*a');file:close();local ok,snapshot=pcall(J.decode,wire)
+  if ok and snapshot.url==url and type(snapshot.entries)=='table'then M.browser=snapshot.entries;return end
+ end
+ if url==M.default_index then
+  local seed=io.open(root..'community-index.json','rb')
+  if seed then local wire=seed:read('*a');seed:close();local ok,index=pcall(J.decode,wire)
+   if ok then for _,entry in ipairs(index.mods or {})do M.browser[#M.browser+1]={name=entry.name,repository=entry.url,status='discoverable'}end end
+  end
+ end
+end
+function M.RefreshCatalogue(url,force)
  if type(url)~='string'or url:match('^%s*$')then url=M.default_index end
- M.browse_requested=true
+ M.PrimeCatalogue(url)
+ if M.catalogue_loading then return end
+ M.browse_requested=true;M.catalogue_loading=true
  F.SetSetting('BladesongModFramework','registry_url',url)
- M.Job('browse',{index_url=url})
+ F.StartJob('browse',{index_url=url,force=force==true},function(result)
+  M.catalogue_loading=false
+  if M.browser_url~=url then M.browse_requested=false;return end
+  if result.entries then
+   M.browser=result.entries
+   local file=io.open(root..'../../BladesongModFramework/Data/catalogue-view.json','wb')
+   if file then file:write(J.encode({url=url,entries=result.entries}));file:close()end
+  end
+  M.catalogue_message=result.error or result.message
+  if M.page=='browse'and not M.busy then M.Render()end
+ end)
+end
+function M.CheckUpdates()
+ if M.update_checking then return end;M.update_checking=true
+ if M.page=='installed'then M.Render()end
+ F.StartJob('updates',{},function(result)
+  M.update_checking=false;M.updates=result.updates or {};M.update_message=result.error or (result.message and result.message~=''and result.message)or 'Update check complete.'
+  if M.page=='installed'and not M.busy then M.Render()end
+ end)
 end
 
 local function new(panel,kind)local o=StaticConstructObject(obj('/Script/UMG.'..kind),panel.WidgetTree);assert(valid(o),kind..' unavailable');return o end
@@ -60,6 +95,21 @@ end
 
 local function add(parent,w)local slot=parent:AddChildToVerticalBox(w);slot:SetHorizontalAlignment(0);slot:SetPadding({Left=12,Right=12,Top=8,Bottom=8});return slot end
 
+local function url_field(panel)
+ local input=new(panel,'EditableTextBox');input:SetHintText(text('https://github.com/owner/repository'));input:SetText(text(M.manual_url or ''))
+ local style=input.WidgetStyle
+ for _,name in ipairs({'BackgroundImageNormal','BackgroundImageHovered','BackgroundImageFocused','BackgroundImageReadOnly'})do style[name].DrawAs=0 end
+ local font=style.TextStyle.Font;local reference=M.main.VersionText.Font
+ font.FontObject=reference.FontObject;font.TypefaceFontName=reference.TypefaceFontName;font.Size=26
+ local gold={R=.56,G=.51,B=.35,A=1};input:SetForegroundColor(gold)
+ style.ForegroundColor={SpecifiedColor=gold,ColorUseRule=0};style.FocusedForegroundColor={SpecifiedColor=gold,ColorUseRule=0};style.ReadOnlyForegroundColor={SpecifiedColor=gold,ColorUseRule=0}
+ style.TextStyle.ColorAndOpacity={SpecifiedColor=gold,ColorUseRule=0};style.Padding.Left=8;style.Padding.Right=8;style.Padding.Top=8;style.Padding.Bottom=8
+ local frame=new(panel,'Border');frame:SetBrushColor({R=.20,G=.19,B=.13,A=1});frame:SetPadding({Left=2,Top=2,Right=2,Bottom=2})
+ local background=new(panel,'Border');background:SetBrushColor({R=.008,G=.008,B=.006,A=1});background:SetPadding({Left=4,Top=4,Right=4,Bottom=4});background:SetContent(input);frame:SetContent(background)
+ local height=new(panel,'SizeBox');height:SetHeightOverride(70);height:SetContent(frame)
+ return input,height
+end
+
 local function button(panel,caption,callback)
 
  local ref=M.main.QuitButton;if panel~=M.main and valid(M.main.WBP_OptionsMenu)and valid(M.main.WBP_OptionsMenu.WBP_BladesongButton)then ref=M.main.WBP_OptionsMenu.WBP_BladesongButton end;local w=widget(panel,ref:GetClass());assert(valid(w));w:SetStyle(ref:GetStyle():GetClass());w:SetCaption(text(caption));w:SetMinDimensions(0,64);w:SetToolTipText(text(''))
@@ -83,6 +133,7 @@ end
 function M.Render()
 
  if not valid(M.content)then return end
+ if valid(M.url)then M.manual_url=plain(M.url:GetText())end
 
  for _,id in ipairs(M.content_action_ids or {})do M.actions[id]=nil end;M.content_action_ids={};M.content:ClearChildren();M.rendering_content=true
 
@@ -97,6 +148,8 @@ function M.Render()
   local community,utilities=catalogue.partition(F.GetRegisteredMods())
   line('INSTALLED MODS',nil,28)
   line('Manage your mods here. Enable and disable changes take effect after restarting the game.',nil,24)
+  line(M.update_checking and 'Checking for updates in the background...'or(M.update_message or 'Updates are checked automatically at startup.'),nil,23)
+  action('Check for updates',M.CheckUpdates)
   local function render_mod(mod)
    local frame=new(M.panel,'Border');frame:SetBrushColor({R=.20,G=.19,B=.13,A=1});frame:SetPadding({Left=2,Top=2,Right=2,Bottom=2});add(M.content,frame)
    local inside=new(M.panel,'Border');inside:SetBrushColor({R=.008,G=.008,B=.006,A=.97});inside:SetPadding({Left=22,Top=18,Right=22,Bottom=18});frame:SetContent(inside)
@@ -112,6 +165,10 @@ function M.Render()
    if mod.integration=='ordinary'then line('Uses its own game interfaces; behavior has not been verified by the framework.',body,23)elseif mod.compatibility then line('Compatibility: '..mod.compatibility.state..' (behavior not automatically verified)',body,23)end
    for _,failure in ipairs(mod.failures or {})do line(failure,body,24)end
    for page,definition in pairs(mod.pages or {})do action(definition.title or page,function()M.Close();F.SendPage(mod.id,page)end,body)end
+   for _,update in ipairs(M.updates or {})do if update.id==mod.id then
+    line('Update available: '..update.version,body,24)
+    action('Update to '..update.version,function()M.Install(update.source or mod.repository,mod.id)end,body)
+   end end
    if mod.id~='BladesongModFramework'then action((mod.enabled==false and 'Enable'or 'Disable')..' on next launch',function()M.Job('toggle',{id=mod.id,enabled=mod.enabled==false})end,body)end
   end
   for _,mod in ipairs(community)do render_mod(mod)end
@@ -122,55 +179,22 @@ function M.Render()
 
  elseif M.page=='browse'then
   line('COMMUNITY MODS',nil,28)
-  line('The index lists names and repository links. Details belong to each mod author; release metadata is reviewed before installation.',nil,24)
-  M.registry=new(M.panel,'EditableTextBox');M.registry:SetHintText(text('Community mod index'));local preferences=F.GetSettings('BladesongModFramework');local url=preferences.registry_url;if type(url)~='string'or url:match('^%s*$')then url=M.default_index end;M.registry:SetText(text(url));add(M.content,M.registry)
-  action('Refresh catalogue',function()M.RefreshCatalogue(plain(M.registry:GetText()))end)
+  line('Install validates and downloads the mod, then restarts Bladesong automatically.',nil,24)
+  local installed_mods=F.GetRegisteredMods()
+  local url=M.default_index;M.PrimeCatalogue(url)
+  line('Install from URL',nil,26)
+  local field;M.url,field=url_field(M.panel);add(M.content,field)
+  action('Install from URL',function()M.Install(plain(M.url:GetText()))end)
+  action('Refresh catalogue',function()M.RefreshCatalogue(M.default_index,true)end)
+  if M.catalogue_loading then line('Refreshing in the background...',nil,23)elseif M.catalogue_message then line(M.catalogue_message,nil,23)end
   for _,entry in ipairs(M.browser or {})do
    line(entry.manifest and entry.manifest.name or entry.name,nil,30)
-   if entry.manifest then line(entry.manifest.description or '',nil,24);line('Repository version '..entry.manifest.version..(entry.cached and ' (cached)'or ''),nil,23)
-    action('Install',function()
-     M.preview=nil;M.browse_install_repository=entry.repository
-     M.Job('inspect',{url=entry.repository})
-    end)
-    if M.browse_install_repository==entry.repository and M.preview then
-     line('Install '..M.preview.name..' '..M.preview.version..' | Compatibility: '..(M.preview.compatibility or 'unknown'),nil,24)
-     action('Confirm install',function()M.Job('stage',{source=M.preview.source,expected_id=M.preview.id,expected_version=M.preview.version,expected_manifest_sha256=M.preview.manifest_sha256})end)
-    end
+   if entry.manifest then line(entry.manifest.description or '',nil,24);line('Repository version '..entry.manifest.version..(entry.cached and ' (cached)'or ''),nil,23)end
+   if catalogue.installed(entry,installed_mods)then line('✓ Installed',nil,26)
+   elseif entry.manifest or entry.status=='discoverable'then
+    action('Install',function()M.Install(entry.repository,entry.manifest and entry.manifest.id)end)
    else line('Repository unavailable: '..(entry.error or ''),nil,23)end
   end
- elseif M.page=='install'then
-
-  line('Paste a public GitHub repository/release URL, release asset, or HTTPS manifest/archive. Review first; installing runs publisher code after restart.')
-
-  M.url=new(M.panel,'EditableTextBox');M.url:SetHintText(text('https://github.com/owner/repository'));add(M.content,M.url)
-
-  action('Inspect URL',function()M.Job('inspect',{url=plain(M.url:GetText())})end)
-
-  if M.preview then
-
-   line(M.preview.name..' '..M.preview.version..' by '..(M.preview.author or 'Unknown'));line(M.preview.description or '')
-
-   line('Source: '..M.preview.source..' | Compatibility: '..(M.preview.compatibility or 'unknown'))
-
-   action('Install — download and stage',function()M.Job('stage',{source=M.preview.source,expected_id=M.preview.id,expected_version=M.preview.version,expected_manifest_sha256=M.preview.manifest_sha256})end)
-
-  end
-
- elseif M.page=='updates'then
-
-  line('Updates are checked against each installed manifest repository. Stable/prerelease and pinned versions are respected. Unknown compatibility cannot be auto-installed.')
-
-  action('Check for updates',function()M.Job('updates',{})end)
-
-  for _,update in ipairs(M.updates or {})do
-
-   line(update.name..' '..update.version..' | '..update.compatibility);line(update.release_notes or '')
-
-   action('Review '..update.name,function()M.preview=update;M.page='install';M.Render()end)
-
-  end
-
-
  elseif M.page=='settings'then
 
   line('Registered settings (saved per mod; changes are read by the owning mod).')
@@ -198,7 +222,7 @@ function M.Render()
  end
 
  if M.message then line(M.message)end
- if M.staged or M.page=='updates'then
+ if M.staged then
   action('Restart & Apply',function()M.restart_review=not M.restart_review;M.Render()end)
  end
  if M.restart_review then
@@ -206,10 +230,15 @@ function M.Render()
   action('Confirm saved - restart and apply',function()M.quit_after_job=true;M.Job('restart',{})end)
  end
  M.rendering_content=false
- if M.page=='browse'and not M.browse_requested and not M.busy then M.RefreshCatalogue(plain(M.registry:GetText()))end
+ if M.page=='browse'and not M.browse_requested and not M.busy then M.RefreshCatalogue(M.default_index)end
 
 end
 
+function M.Install(url,id)
+ if M.busy then return end
+ M.quit_after_job=true
+ M.Job('install',{url=url,expected_id=id or ''})
+end
 function M.Job(operation,args)
 
  if M.busy then return end
@@ -217,7 +246,7 @@ function M.Job(operation,args)
  local ok,err=pcall(function()F.StartJob(operation,args,function(result)
 
   M.busy=false;M.message=result.error or result.message or result.status
-  if operation=='stage'and result.status=='complete'then M.staged=true end
+  if(operation=='stage'or operation=='toggle')and result.status=='complete'then M.staged=true end
   if result.status=='failed'then M.quit_after_job=false end
 
   if result.entries then M.browser=result.entries end;if result.mod then M.preview=result.mod end;if result.updates then M.updates=result.updates end
@@ -230,9 +259,9 @@ function M.Job(operation,args)
 
   M.Render()
 
- end);M.busy=true;M.message='Workingâ€¦';M.Render()end)
+ end);M.busy=true;M.message=operation=='install'and 'Validating and downloading; Bladesong will restart when ready...'or 'Working...';M.Render()end)
 
- if not ok then M.busy=false;M.message=tostring(err);M.Render()end
+ if not ok then M.busy=false;M.quit_after_job=false;M.message=tostring(err);M.Render()end
 
 end
 
@@ -270,7 +299,7 @@ function M.Open()
 
  local ts={home=panel,folder_tabs={},active_tab_id=M.page};M.tabstate=ts
 
- for i,definition in ipairs({{'installed','Installed'},{'browse','Browse'},{'install','Install'},{'updates','Updates'},{'settings','Settings'},{'developer','Developer'}})do tabs.tab(ts,nav,definition[2],'manager_tab',(i-1)*240,{id=definition[1],width=240})end;tabs.update(ts)
+ for i,definition in ipairs({{'installed','Installed'},{'browse','Browse'},{'settings','Settings'},{'developer','Developer'}})do tabs.tab(ts,nav,definition[2],'manager_tab',(i-1)*240,{id=definition[1],width=240})end;tabs.update(ts)
 
  local scroll=new(panel,'ScrollBox');local slot=add(body,scroll);slot:SetSize({Value=1,SizeRule=1});M.content=new(panel,'VerticalBox');scroll:AddChild(M.content)
 
@@ -286,13 +315,17 @@ function M.Open()
 
 end
 
-function M.Monitor()
+function M.DrainActions()
+ M.action_tick_pending=false
  local pending=M.pending_actions;M.pending_actions={}
  for _,entry in ipairs(pending)do
   if valid(entry.widget)and M.actions[entry.widget:GetAddress()]==entry then
    local ok,why=pcall(entry.callback);if not ok then F.errors[#F.errors+1]=tostring(why);print('[BMF] '..tostring(why)..'\n')end
   end
  end
+end
+function M.Monitor()
+ M.DrainActions()
  if valid(M.panel)and valid(M.switcher)then
   -- CommonAnimatedSwitcher keeps reporting the outgoing page during its animation.
   -- That is not a Back/navigation action and must never remove the incoming page.
@@ -357,7 +390,12 @@ RegisterHook('/Script/CommonUI.CommonButtonBase:HandleButtonClicked',function(co
  local b=context:get();if not valid(b)then return end;local a=M.actions[b:GetAddress()]
 
  -- Rebuild on the next game-thread tick, after Slate's click callback unwinds.
- if a and valid(a.widget)then M.pending_actions[#M.pending_actions+1]=a end
+ if a and valid(a.widget)then
+  M.pending_actions[#M.pending_actions+1]=a
+  if not M.action_tick_pending and type(ExecuteInGameThreadWithDelay)=='function'then
+   M.action_tick_pending=true;ExecuteInGameThreadWithDelay(1,M.DrainActions)
+  end
+ end
 
 end)
 

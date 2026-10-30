@@ -2,7 +2,7 @@ local root=assert(...,'Framework module root required')
 local J=assert(loadfile(root..'json.lua'))();local V=assert(loadfile(root..'semver.lua'))()
 local map=assert(loadfile(root..'compat/shared.lua'))()
 local patches=assert(loadfile(root..'compat/patches.lua'))(root,J)
-local F={VERSION='0.1.5',API_VERSION='1.0.0',MANIFEST_VERSION=1,root=root,callbacks={},errors={}}
+local F={VERSION='0.1.6',API_VERSION='1.0.0',MANIFEST_VERSION=1,root=root,callbacks={},errors={}}
 local function valid(o)local ok,v=pcall(function()return o and o:IsValid()end);return ok and v end
 local function get(k)if not ModRef then return nil end;return ModRef:GetSharedVariable('BMF1:'..k)end
 local function set(k,v)assert(ModRef,'UE4SS ModRef unavailable');ModRef:SetSharedVariable('BMF1:'..k,v)end

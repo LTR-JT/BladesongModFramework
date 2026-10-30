@@ -7,3 +7,7 @@ assert(#community==3 and #utilities==2)
 assert(community[1]==mods[2] and community[3]==mods[4])
 assert(utilities[1]==mods[1] and utilities[2]==mods[5])
 print('PASS: bundled utilities grouped; PCL, framework and unknown community mods remain visible')
+
+assert(C.installed({manifest={id='PreconstructionLibraryProbe'}},mods))
+assert(C.installed({repository='https://github.com/example/mod/'},{{id='Disabled',enabled=false,repository='https://github.com/EXAMPLE/MOD.git'}}))
+assert(not C.installed({name='OtherCommunityMod',repository='https://github.com/another/repo'},mods))

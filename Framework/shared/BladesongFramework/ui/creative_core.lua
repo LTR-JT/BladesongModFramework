@@ -78,15 +78,14 @@ function pcl151762_mode(state,mode)
     if mode=='all'then state.view='all';state.page=1;state.form:SetVisibility(1);pcl151762_render(state);pcl151762_status(state,'');return end
     if mode~='delete'then
         assert(mode=='parts' or mode=='blades','Unknown library tab')
-        if mode=='blades'then
-            local path=PCL151761_BLADE_DIR:gsub('[\\/]$','');local args={#path}
-            for i=1,#path do args[#args+1]=path:byte(i)end
-            assert(pcl151761_bridge().mkdir(table.unpack(args))==1,'Could not open the blade library folder')
-        end
+        state.preview_cache=state.preview_cache or {};state.preview_cache[PCL151761_MODE]=state.preview_cache[PCL151761_MODE]or PCL151724_PREVIEWS or {}
         PCL151761_MODE=mode;PCL15171_LIBRARY_DIR=mode=='blades' and PCL151761_BLADE_DIR or PCL151761_PARTS_DIR
         PCL15171_LIBRARY_PATH=mode=='blades' and (PCL15171_LIBRARY_DIR..'library.index') or PCL151761_PARTS_PATH
-        PCL151724_PREVIEWS={};PCL151730_PREVIEW_CHECKED={};PCL151727_PREVIEW_QUEUE=nil
-        pcl15171_load_library();pcl151724_load_metadata()
+        state.preview_cache=state.preview_cache or {};state.preview_cache[mode]=state.preview_cache[mode]or {}
+        PCL151724_PREVIEWS=state.preview_cache[mode]
+        local entries=BMF_CREATIVE_LIBRARY_CACHE.entries(mode,PCL15171_LIBRARY_DIR,PCL15171_LIBRARY_PATH)
+        PCL15171_LIBRARY={};for _,entry in ipairs(entries)do PCL15171_LIBRARY[#PCL15171_LIBRARY+1]=entry.code end
+        pcl151724_load_metadata()
     end
     state.view=mode;state.page=1;state.form:SetVisibility(1);pcl151762_render(state);pcl151762_status(state,'')
 end
@@ -296,6 +295,31 @@ function pcl151762_library_delete(state)
     pcl151762_status(state,'Removed '..request.count..' library entries. Backups kept.')
 end
 
+function pcl151762_exit_to_main(state)
+ assert(not state.busy and not state.confirm and not PCL151762_IMPORT,'Finish the current operation first')
+ local player=state.home:GetOwningPlayer()
+ local function finish()
+  if PCL151762_HOME~=state then return true end
+  for _,menu in pairs(FindAllOf('WBP_PauseMenu_C')or {})do
+   if is_valid(menu)and is_valid(menu.BtnMainMenu)and is_valid(menu:GetOwningPlayer())and menu:GetOwningPlayer():GetAddress()==player:GetAddress()then
+    local button=menu.BtnMainMenu
+    pcl151762_cleanup_home()
+    button:HandleButtonClicked() -- Use the game's own save/navigation flow.
+    return true
+   end
+  end
+  return false
+ end
+ if finish()then return end
+ for _,opener in pairs(FindAllOf('BP_MenuOpener_C')or {})do
+  if is_valid(opener)and not safe_full_name(opener):find('Default__',1,true)then
+   opener:TogglePauseMenu()
+   pcl15179_schedule(1,function()if not finish()then pcl151762_status(state,'Main menu control is unavailable. Use the pause menu to return.')end end)
+   return
+  end
+ end
+ error('Native menu controller is unavailable')
+end
 function pcl151762_dispatch(action)
     if not action.kind or action.kind:sub(1,5)~='home_'then return false end
     local state=action.home_state or PCL151762_HOME
@@ -304,6 +328,7 @@ function pcl151762_dispatch(action)
         pcl151762_context(state)
         local kind=action.kind
         if kind=='home_folder_tab'then PCL_FOLDER_TABS.select(action.tab_id,state);pcl151762_controls(state);return end
+        if kind=='home_exit'then pcl151762_exit_to_main(state);return end
         if kind=='home_close'then pcl151762_close(state);return end
         if kind=='home_libraries'then pcl151762_open(state,state.last_library_view or 'all');return end
         if kind=='home_multi_delete'then
@@ -403,6 +428,7 @@ function pcl151762_context(state)
     return gs,original,gm,utils
 end
 function pcl151762_restore_cards(state)
+    state.card_patch_key=nil
     for _,entry in ipairs(state.native_cards or {})do
         pcall(pcl151762_restore_swap,entry.swap)
         pcall(function()if is_valid(entry.remove)then entry.remove:SetIsInteractionEnabled(entry.remove_interaction)end end)
@@ -412,6 +438,15 @@ function pcl151762_restore_cards(state)
 end
 function pcl151762_patch_cards(state)
     if not state.open or state.patching then return end
+    local control=state.home.PieceItemsCollection
+    local identity={state.view,tostring(state.library_selecting)}
+    for i=0,control.ItemPanel:GetChildrenCount()-1 do
+     local view=control:GetChildAt(i);local piece=is_valid(view)and view.BoundPiece
+     identity[#identity+1]=is_valid(view)and tostring(view:GetAddress())or '?'
+     identity[#identity+1]=is_valid(piece)and tostring(piece:GetAddress())or '?'
+    end
+    local patch_key=table.concat(identity,':')
+    if state.card_patch_key==patch_key then return end
     state.patching=true
     local ok,err=pcall(function()
         pcl151762_restore_cards(state)
@@ -460,7 +495,7 @@ function pcl151762_patch_cards(state)
         state.rendering_rows=false;pcl151762_controls(state)
     end)
     state.rendering_rows=false;state.patching=false
-    if not ok then pcl151762_status(state,'Card update stopped: '..tostring(err))end
+    if ok then state.card_patch_key=patch_key else pcl151762_status(state,'Card update stopped: '..tostring(err))end
 end
 function pcl151762_controls(state)
     local deleting=state.open and (state.view=='delete'or state.library_selecting);local locked=state.busy or state.confirm~=nil
@@ -471,6 +506,7 @@ function pcl151762_controls(state)
     local n=pcl151762_selected_count(state)
     pcl151762_action_caption(state,state.remove,state.confirm and ('Confirm delete '..n)or ('Delete selected ('..n..')'))
     state.remove:SetIsEnabled(not state.busy and n>0)
+    if is_valid(state.exit_button)then state.exit_button:SetIsEnabled(not locked and not PCL151762_IMPORT)end
     state.close:SetIsEnabled(not state.busy);if is_valid(state.nav_library)then state.nav_library:SetIsEnabled(not locked and not PCL151762_IMPORT)end
     pcl151762_action_opacity(state,state.close,(not state.open or deleting)and 1 or .40)
     pcl151762_action_opacity(state,state.nav_library,state.open and not deleting and 1 or .40)
@@ -527,30 +563,44 @@ function pcl151762_render(state)
         state.heading:SetText(pcl15171_to_text('CREATIVE MODE SWORDS / MULTI-DELETE'))
         control:Bind(original)
     else
-        local collection=StaticConstructObject(StaticFindObject('/Script/Bladesong.ObservableCollection'),state.home);pcl151731_fresh(collection)
-        assert(is_valid(collection),'Library display collection unavailable')
-        local piececlass=StaticFindObject('/Script/Bladesong.Piece');assert(is_valid(piececlass),'Library display data unavailable')
-        state.piece_codes={};state.view_codes={};state.piece_previews={};state.piece_entries={};state.library_items={};state.library_collection=collection
-        -- These data-only presentation objects belong exclusively to the new
-        -- collection. Neither GameState inventory receives any AddObject call.
-        for _,entry in ipairs(pcl151762_display_entries(state))do
-            local code=entry.code
-            local piece=StaticConstructObject(piececlass,collection);pcl151731_fresh(piece);assert(is_valid(piece),'Library display entry unavailable')
-            piece.Name=pcl15171_to_text(entry.name);state.piece_codes[piece:GetAddress()]=code;state.piece_entries[piece:GetAddress()]=entry;state.library_items[#state.library_items+1]={id=entry.mode..':'..code,code=code,mode=entry.mode}
-            state.piece_previews=state.piece_previews or {};state.piece_previews[piece:GetAddress()]=entry.preview
-            collection:AddObject(piece)
+        local entries=pcl151762_display_entries(state)
+        local fingerprint={};for _,entry in ipairs(entries)do fingerprint[#fingerprint+1]=entry.mode..':'..#entry.code..':'..entry.code..':'..#entry.name..':'..entry.name end
+        fingerprint=table.concat(fingerprint,'\n')
+        state.collection_cache=state.collection_cache or {};local cached=state.collection_cache[state.view]
+        if cached and cached.fingerprint==fingerprint and is_valid(cached.collection)then
+         state.library_collection=cached.collection;state.piece_codes=cached.codes;state.view_codes={};state.piece_entries=cached.entries;state.library_items=cached.items;state.piece_previews=cached.previews
+        else
+         local collection=StaticConstructObject(StaticFindObject('/Script/Bladesong.ObservableCollection'),state.home);pcl151731_fresh(collection)
+         assert(is_valid(collection),'Library display collection unavailable')
+         local piececlass=StaticFindObject('/Script/Bladesong.Piece');assert(is_valid(piececlass),'Library display data unavailable')
+         state.piece_codes={};state.view_codes={};state.piece_previews={};state.piece_entries={};state.library_items={};state.library_collection=collection
+         for _,entry in ipairs(entries)do
+          local code=entry.code;local piece=StaticConstructObject(piececlass,collection);pcl151731_fresh(piece);assert(is_valid(piece),'Library display entry unavailable')
+          piece.Name=pcl15171_to_text(entry.name);state.piece_codes[piece:GetAddress()]=code;state.piece_entries[piece:GetAddress()]=entry
+          state.library_items[#state.library_items+1]={id=entry.mode..':'..code,code=code,mode=entry.mode};state.piece_previews[piece:GetAddress()]=entry.preview
+          collection:AddObject(piece)
+         end
+         state.collection_cache[state.view]={fingerprint=fingerprint,collection=collection,codes=state.piece_codes,entries=state.piece_entries,items=state.library_items,previews=state.piece_previews}
         end
+        for address,entry in pairs(state.piece_entries)do
+         state.piece_previews[address]=state.preview_cache and state.preview_cache[entry.mode]and state.preview_cache[entry.mode][entry.code]or entry.preview
+        end
+        pcl151762_queue_previews(state,entries)
         state.heading:SetText(pcl15171_to_text('PRECONSTRUCTION LIBRARY / '..state.view:upper()))
-        control:Bind(collection)
+        state.patching=true
+        local bound,why=pcall(function()control:Bind(state.library_collection)end)
+        state.patching=false;assert(bound,why)
     end
     pcl151762_patch_cards(state);pcl151762_controls(state)
     pcl15179_schedule(1,function()if PCL151762_HOME==state then pcl151762_refresh_native_images(state)end end)
 end
 function pcl151762_open(state,mode)
+    local started=os.clock()
     if state.story_open then pcl151762_close(state)end
     pcl151762_context(state);state.open=true
     if PCL151762_IMPORT then mode=PCL151762_IMPORT.mode else pcl151762_mode(state,mode)end
     pcl151762_native_view(state,false);pcl151762_input(state,true)
+    log('BMF_LIBRARY_OPEN_MS '..math.floor((os.clock()-started)*1000)..' view='..tostring(state.view))
 end
 function pcl151762_close(state)
     if state.busy then return end
@@ -593,6 +643,13 @@ function pcl151762_create_home(home)
     state.heading_opacity=state.heading:GetRenderOpacity();state.heading_visibility=state.heading:GetVisibility();state.heading:SetVisibility(2)
     toolbar:AddToViewport(91);toolbar:SetDesiredSizeInViewport({X=1200,Y=84});toolbar:SetPositionInViewport({X=0,Y=0},false);toolbar:SetAnchorsInViewport({Minimum={X=.10,Y=.035},Maximum={X=.10,Y=.035}});toolbar:SetAlignmentInViewport({X=0,Y=0})
     pcl151762_controls(state);pcl151762_mount_folder_tabs(state);pcall(pcl151762_align_toolbar,state)
+    if BMF_CREATIVE_HAS_PROVIDER then
+     pcl15179_schedule(1,function()
+      if PCL151762_HOME~=state then return end
+      local view=state.view;state.view='all';local entries=pcl151762_display_entries(state);state.view=view
+      pcl151762_queue_previews(state,entries)
+     end)
+    end
     log('PCL15_17_62_CREATIVE_TOOLS_READY native_grid=true separate_library_collection=true story_unchanged=true')
     return state
 end
@@ -824,30 +881,63 @@ function pcl151762_outline_action(state,parent,caption,kind,width)
     return button
 end
 
+BMF_CREATIVE_LIBRARY_CACHE=assert(loadfile(BMF_CREATIVE_ROOT..'ui/library_cache.lua'))()
 function pcl151762_display_entries(state)
-    local entries={}
-    local function collect(mode)
-        for _,code in ipairs(PCL15171_LIBRARY)do
-            local preview=PCL151724_PREVIEWS[code]
-            if not preview or not is_valid(preview.texture)then
-                pcall(function()if not pcl151727_load_preview(code,state.home)and pcl151726_has_cache(code)then pcl151762_preview_from_cache(code,state.home)end end)
-            end
-            entries[#entries+1]={code=code,mode=mode,name=pcl151724_name(code)..(state.view=='all'and(mode=='blades'and ' [Blade]'or ' [Parts]')or ''),preview=PCL151724_PREVIEWS[code]}
-        end
+ local entries={};local snapshots={}
+ for _,mode in ipairs(state.view=='all'and {'parts','blades'}or {state.view})do
+  local directory=mode=='blades'and PCL151761_BLADE_DIR or PCL151761_PARTS_DIR
+  local list,snapshot=BMF_CREATIVE_LIBRARY_CACHE.entries(mode,directory,mode=='parts'and PCL151761_PARTS_PATH or directory..'library.index')
+  snapshots[#snapshots+1]=snapshot
+  state.preview_cache=state.preview_cache or {};state.preview_cache[mode]=state.preview_cache[mode]or {}
+  for _,entry in ipairs(list)do
+   local preview=state.preview_cache[mode][entry.code]
+   if not preview and PCL151761_MODE==mode then preview=PCL151724_PREVIEWS[entry.code]end
+   if preview and is_valid(preview.texture)then state.preview_cache[mode][entry.code]=preview end
+   entries[#entries+1]={code=entry.code,mode=mode,name=entry.name..(state.view=='all'and(mode=='blades'and ' [Blade]'or ' [Parts]')or ''),preview=preview}
+  end
+ end
+ state.library_snapshots=snapshots
+ return entries
+end
+function pcl151762_queue_previews(state,entries)
+ state.preview_cache=state.preview_cache or {};state.preview_queued=state.preview_queued or {};state.preview_jobs=state.preview_jobs or {}
+ for _,entry in ipairs(entries)do
+  local key=entry.mode..':'..entry.code
+  local preview=state.preview_cache[entry.mode]and state.preview_cache[entry.mode][entry.code]
+  if (not preview or not is_valid(preview.texture))and not state.preview_queued[key]then state.preview_queued[key]=true;state.preview_jobs[#state.preview_jobs+1]=entry end
+ end
+ if state.preview_loading or #state.preview_jobs==0 then return end;state.preview_loading=true
+ local function step()
+  if PCL151762_HOME~=state or not pcl151762_visible(state.home)then state.preview_loading=false;return end
+  local entry=table.remove(state.preview_jobs,1)
+  if not entry then state.preview_loading=false;state.preview_queued={};return end
+  local cache=state.preview_cache[entry.mode]or {};state.preview_cache[entry.mode]=cache
+  local preview=cache[entry.code]
+  if not preview or not is_valid(preview.texture)then
+   local names={'PCL151761_MODE','PCL15171_LIBRARY_DIR','PCL15171_LIBRARY_PATH','PCL151724_PREVIEWS'};local saved={}
+   for _,name in ipairs(names)do saved[name]=_G[name]end
+   PCL151761_MODE=entry.mode;PCL15171_LIBRARY_DIR=entry.mode=='blades'and PCL151761_BLADE_DIR or PCL151761_PARTS_DIR
+   PCL15171_LIBRARY_PATH=entry.mode=='parts'and PCL151761_PARTS_PATH or PCL15171_LIBRARY_DIR..'library.index';PCL151724_PREVIEWS=cache
+   local started=os.clock()
+   local ok,why=pcall(function()if not pcl151727_load_preview(entry.code,state.home)and pcl151726_has_cache(entry.code)then pcl151762_preview_from_cache(entry.code,state.home)end end)
+   preview=cache[entry.code]
+   for _,name in ipairs(names)do _G[name]=saved[name]end
+   if not ok then log('BMF_PREVIEW_LOAD_FAILED '..tostring(why))end
+   local elapsed=(os.clock()-started)*1000;if elapsed>20 then log('BMF_PREVIEW_LOAD_MS '..math.floor(elapsed)..' mode='..entry.mode)end
+  end
+  if preview and is_valid(preview.texture)then
+   for address,record in pairs(state.piece_entries or {})do if record.code==entry.code and record.mode==entry.mode then state.piece_previews[address]=preview end end
+   for _,record in ipairs(state.native_cards or {})do
+    local item=state.piece_entries and state.piece_entries[record.piece:GetAddress()]
+    if item and item.code==entry.code and item.mode==entry.mode and is_valid(record.view.Image)then
+     record.view.Image:SetBrushFromTexture(preview.texture,true);record.view.Image:SetVisibility(0)
+     pcl151751_image_tooltip(state.panel,record.view.Image,preview.texture)
     end
-    if state.view~='all'then collect(state.view);return entries end
-    local names={'PCL151761_MODE','PCL15171_LIBRARY_DIR','PCL15171_LIBRARY_PATH','PCL15171_LIBRARY','PCL151724_META','PCL151724_PREVIEWS','PCL151730_PREVIEW_CHECKED','PCL151727_PREVIEW_QUEUE'}
-    local saved={};for _,name in ipairs(names)do saved[name]=_G[name]end
-    local ok,err=pcall(function()
-        for _,mode in ipairs({'parts','blades'})do
-            PCL151761_MODE=mode;PCL15171_LIBRARY_DIR=mode=='blades'and PCL151761_BLADE_DIR or PCL151761_PARTS_DIR
-            PCL15171_LIBRARY_PATH=mode=='blades'and(PCL15171_LIBRARY_DIR..'library.index')or PCL151761_PARTS_PATH
-            PCL151724_PREVIEWS={};PCL151730_PREVIEW_CHECKED={};PCL151727_PREVIEW_QUEUE=nil
-            pcl15171_load_library();pcl151724_load_metadata();collect(mode)
-        end
-    end)
-    for _,name in ipairs(names)do _G[name]=saved[name]end
-    assert(ok,err);return entries
+   end
+  end
+  pcl15179_schedule(16,step)
+ end
+ pcl15179_schedule(1,step)
 end
 
 function pcl151762_show_story(state)
@@ -946,6 +1036,11 @@ function pcl151762_mount_home_footer(state,outer,inside,section)
     -- one muted gold outline and clipped lower corners, meeting the footer rule.
     local canvas=pcl151723_new(state.home,'CanvasPanel');local box=pcl151723_new(state.home,'SizeBox');box:SetWidthOverride(1120);box:SetHeightOverride(208);box:SetContent(canvas)
     local reserve=pcl151723_new(state.home,'SizeBox');reserve:SetHeightOverride(208);pcl151723_vadd(outer,reserve,0,0)
+    local exit_row=pcl151723_new(state.home,'HorizontalBox');reserve:SetContent(exit_row)
+    pcl151723_hadd(exit_row,pcl151723_new(state.home,'Spacer'),true,0)
+    state.exit_button=pcl151762_outline_action(state,exit_row,'Close','home_exit',240)
+    local exit_box=state.action_visuals[state.exit_button:GetAddress()].container
+    exit_box.Slot:SetVerticalAlignment(3);exit_box.Slot:SetPadding({Left=0,Top=0,Right=0,Bottom=12})
     -- Draw and hit-test Forge last, above the frame/footer that it overlaps.
     local lip=state.forge_layer:AddChildToOverlay(box);lip:SetHorizontalAlignment(2);lip:SetVerticalAlignment(3);box:SetRenderTranslation({X=0,Y=-132})
     local native=state.home.ForgeButton;state.forge_opacity=native:GetRenderOpacity();state.forge_style=native:GetStyle():GetClass()
