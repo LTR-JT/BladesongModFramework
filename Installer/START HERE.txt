@@ -1,0 +1,19 @@
+INSTALL
+
+1. Close Bladesong.
+2. Right-click the downloaded ZIP and choose Extract All.
+3. Open the extracted folder and double-click INSTALL.cmd.
+4. Press Enter to install. If asked for a folder, choose your Bladesong folder.
+5. Start Bladesong. Click Mods above Options on the main menu.
+
+That is it. UE4SS and the Mod Manager are included.
+
+Need to find the game folder?
+Steam > Library > right-click Bladesong > Manage > Browse local files.
+
+If you prefer to copy the files yourself:
+Copy the included Bladesong folder into the game folder opened by Steam.
+Choose Replace when asked. Keep your existing Mods folder and saves.
+
+The installer backs up replaced files in BMF_Backups inside the game folder.
+Your game saves, PCL library and other mods are not deleted.

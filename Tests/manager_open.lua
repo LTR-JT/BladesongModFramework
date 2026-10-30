@@ -28,6 +28,8 @@ local function obj(kind,name)
  function w:SetContent(child)self.children={};self:AddChild(child)end
  function w:ClearChildren()self.children={}end
  function w:SetText(v)self.text=v end
+ function w:GetText()return self.text end
+ function w:SetHintText(v)self.hint=v end
  function w:SetCaption(v)self.caption=v end
  for _,method in ipairs({'SetStyle','SetMinDimensions','SetToolTipText','SetFont','SetAutoWrapText','SetVisibility','SetColorAndOpacity','SetWidthOverride','SetMaxDesiredWidth','SetHeightOverride','SetBrushColor','SetPadding'})do w[method]=function()end end
  function w:AddToViewport()error('Must use native menu switcher, not a viewport overlay')end
@@ -51,7 +53,8 @@ function StaticFindObject(path)
  return obj(path:match('%.([^%.]+)$'))
 end
 function StaticConstructObject(class)return obj(class.kind)end
-function RegisterHook()end
+local click_hook
+function RegisterHook(path,callback)if path:find('HandleButtonClicked',1,true)then click_hook=callback end end
 local original_loadfile=loadfile
 function loadfile(path,...)
  if path:match('ui/primitives.lua$')then return function()return {tab=function()end,update=function()end}end end
@@ -82,5 +85,15 @@ M.Monitor();assert(M.panel==panel and not M.awaiting_page and not panel.removed)
 M.Close();assert(switcher.active==native and panel.removed)
 M.Open();assert(switcher.active==panel and M.content:GetChildrenCount()>0)
 M.Close();assert(switcher.active==native)
+M.main.IsVisible=function()return true end;M.entry=obj('Button');M.entry.parent=M.main
+M.Open();local before=M.panel
+local close
+for _,entry in pairs(M.actions)do if entry.widget.caption=='Close'then close=entry.widget end end
+assert(close)
+click_hook({get=function()return close end})
+assert(M.panel==before and not before.removed,'Click callback destroyed its live native widget')
+M.Monitor();assert(M.panel==nil and before.removed,'Deferred click did not close the page')
+print('PASS: native callback only queues; next game-thread monitor performs widget replacement')
 print('PASS: outgoing page survives delayed native transition and activation settles without premature cleanup')
 print('PASS: complete manager Open/render/Close/reopen with slotless asset root and centered native switcher page; viewport overlays forbidden')
+return M,F,text,obj

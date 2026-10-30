@@ -9,20 +9,29 @@ future game updates still require compatibility work.
 
 ## For players
 
-Install a compatible [UE4SS runtime](https://github.com/UE4SS-RE/RE-UE4SS) first.
-Close the game, then extract the framework **runtime ZIP from Releases** into the
-outer Bladesong game folder, beside `Bladesong.exe`. Do not use GitHub's automatic
-Source code ZIP as an installer. The archive includes the project's shared menu
-asset pack; the game executable and UE4SS are separate dependencies.
+1. Close Bladesong.
+2. Download **BladesongModFramework_0.1.4_Easy_Install_With_UE4SS.zip** from [Releases](https://github.com/LTR-JT/BladesongModFramework/releases/latest).
+3. Right-click the ZIP and choose **Extract All**.
+4. Open the extracted folder and double-click **INSTALL.cmd**.
+5. Press **Enter** to install, then start the game.
 
-The main menu gains a **Mods** button above Options. Mod enabling/disabling takes
-effect on the next launch. Install/update operations require review and normal
-game exit; the framework does not kill the game. Debug windows remain off unless
-enabled in UE4SS settings.
+Click **Mods**, just above **Options**, on the main menu.
+UE4SS is included. You do not need to install it separately.
 
-See [installation](Documentation/installation.md),
-[troubleshooting](Documentation/troubleshooting.md), and the
-[Preconstruction Library](https://github.com/LTR-JT/PreconstructionLibrary).
+If the installer asks for the game folder, open Steam, right-click Bladesong,
+then choose **Manage > Browse local files**. Select that folder in the installer.
+
+Browse loads the community mod list automatically. Each mod is reviewed before
+installation. Your saves, PCL library and other mods are not deleted. Replaced
+files are backed up in **BMF_Backups** inside the game folder.
+
+### Copy files manually instead
+
+Copy the extracted **Bladesong** folder into the game folder opened by Steam.
+Choose **Replace** when asked. Keep existing saves and the Mods folder.
+
+The small Runtime ZIP is for people who already have compatible UE4SS.
+The BMF ZIP is for the in-game updater. GitHub's Source code ZIP is for developers.
 
 ## For mod authors
 

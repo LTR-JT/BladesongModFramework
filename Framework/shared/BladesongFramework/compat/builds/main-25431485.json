@@ -7,7 +7,36 @@
   "status": "PCL baseline and framework menu exercised on this executable",
   "overrides": {},
   "legacy_pcl_native_verified": true,
-  "native_helpers": {},
+  "native_helpers": {
+    "pcl_held_upload_151725b.dll": {
+      "verified": true,
+      "path": "native/25431485/pcl_held_upload_151725b.dll"
+    },
+    "pcl_local_cache_151733.dll": {
+      "verified": true,
+      "path": "native/25431485/pcl_local_cache_151733.dll"
+    },
+    "pcl_blade_library_151761.dll": {
+      "verified": true,
+      "path": "native/25431485/pcl_blade_library_151761.dll"
+    },
+    "pcl_download_capture_151762.dll": {
+      "verified": true,
+      "path": "native/25431485/pcl_download_capture_151762.dll"
+    },
+    "pcl_anchor_catalogue_patch_15170.dll": {
+      "verified": true,
+      "path": "native/25431485/pcl_anchor_catalogue_patch_15170.dll"
+    },
+    "pcl_anchor_socket_151741.dll": {
+      "verified": true,
+      "path": "native/25431485/pcl_anchor_socket_151741.dll"
+    },
+    "pcl_anchor_reload_151756.dll": {
+      "verified": true,
+      "path": "native/25431485/pcl_anchor_reload_151756.dll"
+    }
+  },
   "mod_data": {
     "PreconstructionLibraryProbe": {
       "reflected_layouts": {

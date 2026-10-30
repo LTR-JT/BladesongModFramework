@@ -3,13 +3,30 @@ local F,root=...
 local J=F._json
 local catalogue=assert(loadfile(root..'catalogue.lua'))()
 
-local M={actions={},entries={},page='installed',generation=0}
+local M={actions={},entries={},page='installed',generation=0,pending_actions={}}
+M.default_index='https://raw.githubusercontent.com/LTR-JT/BladesongModFramework/main/mod-index.json'
 
 local function valid(o)return F._valid(o)end
 
 local function obj(path)local o=StaticFindObject(path);assert(valid(o),'Missing '..path);return o end
 
 local function text(s)return obj('/Script/Engine.Default__KismetTextLibrary'):Conv_StringToText(tostring(s or ''))end
+
+local function plain(value)
+ if type(value)=='string'then return value end
+ local converted=obj('/Script/Engine.Default__KismetTextLibrary'):Conv_TextToString(value)
+ if type(converted)=='string'then return converted end
+ local ok,result=pcall(function()return converted:ToString()end)
+ assert(ok and type(result)=='string','Could not read text field')
+ return result
+end
+
+function M.RefreshCatalogue(url)
+ if type(url)~='string'or url:match('^%s*$')then url=M.default_index end
+ M.browse_requested=true
+ F.SetSetting('BladesongModFramework','registry_url',url)
+ M.Job('browse',{index_url=url})
+end
 
 local function new(panel,kind)local o=StaticConstructObject(obj('/Script/UMG.'..kind),panel.WidgetTree);assert(valid(o),kind..' unavailable');return o end
 
@@ -106,12 +123,19 @@ function M.Render()
  elseif M.page=='browse'then
   line('COMMUNITY MODS',nil,28)
   line('The index lists names and repository links. Details belong to each mod author; release metadata is reviewed before installation.',nil,24)
-  M.registry=new(M.panel,'EditableTextBox');M.registry:SetHintText(text('HTTPS URL to mod-index.json'));local preferences=F.GetSettings('BladesongModFramework');if preferences.registry_url and preferences.registry_url~=''then M.registry:SetText(text(preferences.registry_url))end;add(M.content,M.registry)
-  action('Refresh catalogue',function()local url=obj('/Script/Engine.Default__KismetTextLibrary'):Conv_TextToString(M.registry:GetText());F.SetSetting('BladesongModFramework','registry_url',url);M.Job('browse',{index_url=url})end)
+  M.registry=new(M.panel,'EditableTextBox');M.registry:SetHintText(text('Community mod index'));local preferences=F.GetSettings('BladesongModFramework');local url=preferences.registry_url;if type(url)~='string'or url:match('^%s*$')then url=M.default_index end;M.registry:SetText(text(url));add(M.content,M.registry)
+  action('Refresh catalogue',function()M.RefreshCatalogue(plain(M.registry:GetText()))end)
   for _,entry in ipairs(M.browser or {})do
    line(entry.manifest and entry.manifest.name or entry.name,nil,30)
    if entry.manifest then line(entry.manifest.description or '',nil,24);line('Repository version '..entry.manifest.version..(entry.cached and ' (cached)'or ''),nil,23)
-    action('Review release',function()M.page='install';M.tabstate.active_tab_id='install';M.Job('inspect',{url=entry.repository})end)
+    action('Install',function()
+     M.preview=nil;M.browse_install_repository=entry.repository
+     M.Job('inspect',{url=entry.repository})
+    end)
+    if M.browse_install_repository==entry.repository and M.preview then
+     line('Install '..M.preview.name..' '..M.preview.version..' | Compatibility: '..(M.preview.compatibility or 'unknown'),nil,24)
+     action('Confirm install',function()M.Job('stage',{source=M.preview.source,expected_id=M.preview.id,expected_version=M.preview.version,expected_manifest_sha256=M.preview.manifest_sha256})end)
+    end
    else line('Repository unavailable: '..(entry.error or ''),nil,23)end
   end
  elseif M.page=='install'then
@@ -120,7 +144,7 @@ function M.Render()
 
   M.url=new(M.panel,'EditableTextBox');M.url:SetHintText(text('https://github.com/owner/repository'));add(M.content,M.url)
 
-  action('Inspect URL',function()local t=obj('/Script/Engine.Default__KismetTextLibrary'):Conv_TextToString(M.url:GetText());M.Job('inspect',{url=t})end)
+  action('Inspect URL',function()M.Job('inspect',{url=plain(M.url:GetText())})end)
 
   if M.preview then
 
@@ -128,7 +152,7 @@ function M.Render()
 
    line('Source: '..M.preview.source..' | Compatibility: '..(M.preview.compatibility or 'unknown'))
 
-   action('Approve download and stage installation',function()M.Job('stage',{source=M.preview.source,expected_id=M.preview.id,expected_version=M.preview.version,expected_manifest_sha256=M.preview.manifest_sha256})end)
+   action('Install — download and stage',function()M.Job('stage',{source=M.preview.source,expected_id=M.preview.id,expected_version=M.preview.version,expected_manifest_sha256=M.preview.manifest_sha256})end)
 
   end
 
@@ -150,7 +174,7 @@ function M.Render()
 
    M.restart_review=not M.restart_review
 
-   if M.restart_review then line('Save any unsaved gameplay first. This closes Bladesong normally; staged changes apply only after it exits.');action('Confirm saved — restart and apply',function()M.Job('restart',{});M.quit_after_job=true end)end
+   if M.restart_review then line('Save any unsaved gameplay first. This closes Bladesong normally; staged changes apply only after it exits.');action('Confirm saved â€” restart and apply',function()M.Job('restart',{});M.quit_after_job=true end)end
 
   end)
 
@@ -182,6 +206,7 @@ function M.Render()
 
  if M.message then line(M.message)end
  M.rendering_content=false
+ if M.page=='browse'and not M.browse_requested and not M.busy then M.RefreshCatalogue(plain(M.registry:GetText()))end
 
 end
 
@@ -203,7 +228,7 @@ function M.Job(operation,args)
 
   M.Render()
 
- end);M.busy=true;M.message='Working…';M.Render()end)
+ end);M.busy=true;M.message='Workingâ€¦';M.Render()end)
 
  if not ok then M.busy=false;M.message=tostring(err);M.Render()end
 
@@ -260,6 +285,12 @@ function M.Open()
 end
 
 function M.Monitor()
+ local pending=M.pending_actions;M.pending_actions={}
+ for _,entry in ipairs(pending)do
+  if valid(entry.widget)and M.actions[entry.widget:GetAddress()]==entry then
+   local ok,why=pcall(entry.callback);if not ok then F.errors[#F.errors+1]=tostring(why);print('[BMF] '..tostring(why)..'\n')end
+  end
+ end
  if valid(M.panel)and valid(M.switcher)then
   -- CommonAnimatedSwitcher keeps reporting the outgoing page during its animation.
   -- That is not a Back/navigation action and must never remove the incoming page.
@@ -323,7 +354,8 @@ RegisterHook('/Script/CommonUI.CommonButtonBase:HandleButtonClicked',function(co
 
  local b=context:get();if not valid(b)then return end;local a=M.actions[b:GetAddress()]
 
- if a and valid(a.widget)then local ok,e=pcall(a.callback);if not ok then F.errors[#F.errors+1]=tostring(e);print('[BMF] '..tostring(e)..'\n')end end
+ -- Rebuild on the next game-thread tick, after Slate's click callback unwinds.
+ if a and valid(a.widget)then M.pending_actions[#M.pending_actions+1]=a end
 
 end)
 

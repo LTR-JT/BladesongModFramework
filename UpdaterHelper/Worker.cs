@@ -220,6 +220,19 @@ class Worker {
      if(m!=null){if(G(m,"integration")==null)D(m)["integration"]="ordinary";D(m)["enabled"]=Enabled(id);D(m)["discovered"]=true;mods.Add(m);}
     }return Obj("status","complete","mods",mods);
    }
+   case "list-saves":{
+    string source=Path.GetFullPath(S(args,"source"));Need(Path.GetFileName(source)=="SaveGames","Expected SaveGames directory");
+    Need(Directory.Exists(source),"Save directory unavailable");
+    for(string ancestor=source;ancestor!=null;ancestor=Path.GetDirectoryName(ancestor))Need((File.GetAttributes(ancestor)&FileAttributes.ReparsePoint)==0,"Save junction rejected");
+    var files=new List<object>();var pending=new Stack<string>();pending.Push(source);int directories=0;
+    while(pending.Count>0){string directory=pending.Pop();Need(++directories<=6000,"Save directory count limit");
+     foreach(string entry in Directory.EnumerateFileSystemEntries(directory)){
+      var attributes=File.GetAttributes(entry);Need((attributes&FileAttributes.ReparsePoint)==0,"Save link rejected");
+      if((attributes&FileAttributes.Directory)!=0)pending.Push(entry);
+      else if(Path.GetExtension(entry).Equals(".sav",StringComparison.OrdinalIgnoreCase)){Need(files.Count<6000,"Save file count limit");files.Add(Obj("source",entry));}
+     }
+    }return Obj("status","complete","files",files);
+   }
    case "identify":return Obj("status","complete","identity",Identity());
    case "inspect":{Source s=Resolve(S(args,"url"),work);var m=D(s.Manifest);m["source"]=s.Url;m["manifest_sha256"]=s.Digest;m["compatibility"]=Compatibility(m,request);return Obj("status","complete","mod",m);}
    case "stage":{Source s=Resolve(S(args,"source"),work);Stage(s,args,request,work);return Obj("status","complete","message","Validated and staged. Restart & Apply to install.");}

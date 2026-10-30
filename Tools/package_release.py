@@ -7,6 +7,7 @@ meta=json.loads((ROOT/'mod.json').read_text());version=meta['version'];name=meta
 worker=ROOT/'Framework/BladesongModFramework/Scripts/bmf-worker.exe'
 assert worker.is_file(),'Build the worker first'
 assert len(list((ROOT/'Framework/shared/BladesongFramework/native/25940006').glob('*.dll')))==7,'Build native adapters first'
+assert len(list((ROOT/'Framework/shared/BladesongFramework/native/25431485').glob('*.dll')))==7,'Build Main adapters first'
 manual=OUT/f'{name}_{version}_Runtime.zip'
 with zipfile.ZipFile(manual,'w',zipfile.ZIP_DEFLATED)as z:
  for p in sorted((ROOT/'Framework').rglob('*')):

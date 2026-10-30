@@ -21,8 +21,10 @@ jobs:
       - run: python Tools/build_ci_lua.py
       - run: python Tools/run_checks.py --lua Tests/ci-lua/lua.exe
       - run: python Tools/build_native.py --build 25940006
+      - run: python Tools/build_native.py --build 25431485
       - run: python Tools/run_native_tests.py
       - run: python Tools/package_release.py
+      - run: python Tools/build_easy_install.py
       - name: Verify the tag matches the package version
         env:
           RELEASE_TAG: ${{ inputs.tag }}

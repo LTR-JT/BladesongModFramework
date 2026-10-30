@@ -15,11 +15,15 @@ jobs:
       - name: Run checks
         run: python Tools/run_checks.py --lua Tests/ci-lua/lua.exe
       - name: Build native components
-        run: python Tools/build_native.py --build 25940006
+        run: |
+          python Tools/build_native.py --build 25940006
+          python Tools/build_native.py --build 25431485
       - name: Run native behavior fixtures
         run: python Tools/run_native_tests.py
       - name: Prepare install packages
-        run: python Tools/package_release.py
+        run: |
+          python Tools/package_release.py
+          python Tools/build_easy_install.py
       - uses: actions/upload-artifact@v4
         with:
           name: BladesongModFramework-preview
