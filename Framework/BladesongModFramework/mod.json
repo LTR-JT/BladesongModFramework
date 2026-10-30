@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "id": "BladesongModFramework",
+  "name": "Bladesong Mod Framework",
+  "author": "LTR-JT and contributors",
+  "description": "Experimental in-game runtime and SDK foundation",
+  "version": "0.1.3",
+  "api": "^1.0.0",
+  "capabilities": [],
+  "dependencies": {},
+  "files": [],
+  "repository": "https://github.com/LTR-JT/BladesongModFramework",
+  "license": "MIT"
+}

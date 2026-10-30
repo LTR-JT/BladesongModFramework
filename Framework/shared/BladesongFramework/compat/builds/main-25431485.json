@@ -1,0 +1,576 @@
+{
+  "schema_version": 1,
+  "id": "main-25431485",
+  "branch": "main",
+  "buildid": "25431485",
+  "sha256": "de710959ec9959eef9904ac4dee3763d94e92994e9b28e63baa5b50bae8993d5",
+  "status": "PCL baseline and framework menu exercised on this executable",
+  "overrides": {},
+  "legacy_pcl_native_verified": true,
+  "native_helpers": {},
+  "mod_data": {
+    "PreconstructionLibraryProbe": {
+      "reflected_layouts": {
+        "FSwordPartData": {
+          "size": 512,
+          "base": "FBladesongTableRowBase",
+          "fields": {
+            "DisplayName": {
+              "offset": 16,
+              "size": 16
+            },
+            "Status": {
+              "offset": 32,
+              "size": 1
+            },
+            "Type": {
+              "offset": 33,
+              "size": 1
+            },
+            "RenderAsset": {
+              "offset": 40,
+              "size": 40
+            },
+            "Book": {
+              "offset": 80,
+              "size": 8
+            },
+            "bHandGrip": {
+              "offset": 88,
+              "size": 1
+            },
+            "bPreventPlacingOnSurfaces": {
+              "offset": 89,
+              "size": 1
+            },
+            "bWrapAroundBlade": {
+              "offset": 90,
+              "size": 1
+            },
+            "RotationHandlePosition": {
+              "offset": 92,
+              "size": 4
+            },
+            "BendingAxis": {
+              "offset": 96,
+              "size": 1
+            },
+            "BendingHandleBoneName": {
+              "offset": 100,
+              "size": 8
+            },
+            "BendingHandleOffset": {
+              "offset": 108,
+              "size": 8
+            },
+            "Blueprint": {
+              "offset": 120,
+              "size": 8
+            },
+            "MeshTilingTextureUVs": {
+              "offset": 128,
+              "size": 1
+            },
+            "VOffsetHandling": {
+              "offset": 129,
+              "size": 1
+            },
+            "MeshTilingTextureUVScaling": {
+              "offset": 130,
+              "size": 1
+            },
+            "MeshBakedTextureUVs": {
+              "offset": 131,
+              "size": 1
+            },
+            "MeshNormalMap": {
+              "offset": 136,
+              "size": 40
+            },
+            "MeshAmbientOcclusionMap": {
+              "offset": 176,
+              "size": 40
+            },
+            "bDisplayUpright": {
+              "offset": 216,
+              "size": 1
+            },
+            "bHasPrimarySlot": {
+              "offset": 217,
+              "size": 1
+            },
+            "ForcedSlotFlippedState": {
+              "offset": 224,
+              "size": 80
+            },
+            "Slots": {
+              "offset": 304,
+              "size": 16
+            },
+            "SlotsHistory": {
+              "offset": 320,
+              "size": 16
+            },
+            "SurfaceArea": {
+              "offset": 336,
+              "size": 4
+            },
+            "Volume": {
+              "offset": 340,
+              "size": 4
+            },
+            "Centroid": {
+              "offset": 344,
+              "size": 12
+            },
+            "Anisotropy": {
+              "offset": 356,
+              "size": 12
+            },
+            "Hotkey": {
+              "offset": 368,
+              "size": 24
+            },
+            "HighPolyMesh": {
+              "offset": 392,
+              "size": 40
+            },
+            "PropertyLayers": {
+              "offset": 432,
+              "size": 80
+            }
+          }
+        },
+        "FSwordPartSlot": {
+          "size": 48,
+          "base": null,
+          "fields": {
+            "BoneName": {
+              "offset": 0,
+              "size": 8
+            },
+            "Offset": {
+              "offset": 8,
+              "size": 24
+            },
+            "bSpecial": {
+              "offset": 32,
+              "size": 1
+            },
+            "bIsFlippedSlot": {
+              "offset": 33,
+              "size": 1
+            },
+            "UVPosition": {
+              "offset": 36,
+              "size": 8
+            }
+          }
+        },
+        "FAppliedSwordPart": {
+          "size": 288,
+          "base": null,
+          "fields": {
+            "SwordPart": {
+              "offset": 0,
+              "size": 8
+            },
+            "SwordMaterial": {
+              "offset": 8,
+              "size": 8
+            },
+            "Polish": {
+              "offset": 16,
+              "size": 4
+            },
+            "bPending": {
+              "offset": 44,
+              "size": 1
+            },
+            "InventorySwordPart": {
+              "offset": 48,
+              "size": 8
+            },
+            "Scale": {
+              "offset": 56,
+              "size": 4
+            },
+            "Rotation": {
+              "offset": 60,
+              "size": 4
+            },
+            "Sink": {
+              "offset": 64,
+              "size": 4
+            },
+            "Deflection": {
+              "offset": 80,
+              "size": 32
+            },
+            "CurvatureVals": {
+              "offset": 112,
+              "size": 8
+            },
+            "CircleRotations": {
+              "offset": 128,
+              "size": 64
+            },
+            "Stretch": {
+              "offset": 192,
+              "size": 8
+            },
+            "bIsInFlippedSlot": {
+              "offset": 200,
+              "size": 1
+            },
+            "bManualFlip": {
+              "offset": 201,
+              "size": 1
+            },
+            "SlotChildren": {
+              "offset": 208,
+              "size": 16
+            },
+            "FreeChildren": {
+              "offset": 224,
+              "size": 16
+            },
+            "Curvature": {
+              "offset": 240,
+              "size": 8
+            },
+            "SwordPartData": {
+              "offset": 248,
+              "size": 16
+            },
+            "SwordMaterialData": {
+              "offset": 264,
+              "size": 16
+            },
+            "SlotsVersion": {
+              "offset": 280,
+              "size": 4
+            }
+          }
+        },
+        "FWeaponDesignDefinition": {
+          "size": 256,
+          "base": null,
+          "fields": {
+            "TimeToGridSpaceScale": {
+              "offset": 4,
+              "size": 4
+            },
+            "RootSwordPartIdx": {
+              "offset": 104,
+              "size": 4
+            },
+            "BladeMaterial": {
+              "offset": 108,
+              "size": 8
+            },
+            "AppliedAbilities": {
+              "offset": 120,
+              "size": 16
+            },
+            "BladeSwordParts": {
+              "offset": 136,
+              "size": 16
+            },
+            "AppliedSwordParts": {
+              "offset": 152,
+              "size": 16
+            },
+            "Version": {
+              "offset": 168,
+              "size": 4
+            }
+          }
+        },
+        "ASwordPartActor": {
+          "size": 992,
+          "base": "AActor",
+          "fields": {
+            "SwordPartDataHandle": {
+              "offset": 696,
+              "size": 16
+            },
+            "SwordMaterialName": {
+              "offset": 712,
+              "size": 8
+            },
+            "SwordMaterialHandle": {
+              "offset": 720,
+              "size": 12
+            },
+            "SwordMaterialDataHandle": {
+              "offset": 736,
+              "size": 16
+            },
+            "bPending": {
+              "offset": 752,
+              "size": 1
+            },
+            "Scale": {
+              "offset": 756,
+              "size": 4
+            },
+            "Rotation": {
+              "offset": 760,
+              "size": 4
+            },
+            "Sink": {
+              "offset": 764,
+              "size": 4
+            },
+            "Deflection": {
+              "offset": 768,
+              "size": 32
+            },
+            "bIsInFlippedSlot": {
+              "offset": 800,
+              "size": 1
+            },
+            "bManualFlip": {
+              "offset": 801,
+              "size": 1
+            },
+            "Polish": {
+              "offset": 804,
+              "size": 4
+            },
+            "InventorySwordPart": {
+              "offset": 808,
+              "size": 8
+            },
+            "SlotChildParts": {
+              "offset": 816,
+              "size": 80
+            },
+            "FreeChildParts": {
+              "offset": 896,
+              "size": 80
+            }
+          }
+        },
+        "UPiece": {
+          "size": 1120,
+          "base": "UDataAsset",
+          "fields": {
+            "WeaponDesignDefinition": {
+              "offset": 48,
+              "size": 256
+            },
+            "CurrentSwordmakingStage": {
+              "offset": 304,
+              "size": 4
+            },
+            "CurrentSideEditingMode": {
+              "offset": 308,
+              "size": 1
+            },
+            "PhysicalValues": {
+              "offset": 312,
+              "size": 80
+            },
+            "RawGameplayValues": {
+              "offset": 392,
+              "size": 80
+            },
+            "GameplayValues": {
+              "offset": 472,
+              "size": 80
+            },
+            "ResourceFactors": {
+              "offset": 712,
+              "size": 80
+            },
+            "ResourcesPaid": {
+              "offset": 792,
+              "size": 80
+            },
+            "CameraTransforms": {
+              "offset": 872,
+              "size": 16
+            },
+            "PieceId": {
+              "offset": 888,
+              "size": 8
+            },
+            "Name": {
+              "offset": 896,
+              "size": 16
+            },
+            "BilletResourceCost": {
+              "offset": 912,
+              "size": 4
+            },
+            "AssignedCommission": {
+              "offset": 920,
+              "size": 8
+            },
+            "AppliedQuenchLiquidItem": {
+              "offset": 928,
+              "size": 8
+            },
+            "AppliedForgingRecipeItems": {
+              "offset": 936,
+              "size": 80
+            },
+            "CachedPreviewImage": {
+              "offset": 1016,
+              "size": 8
+            },
+            "CustomerNameForCreativeMode": {
+              "offset": 1104,
+              "size": 16
+            }
+          }
+        },
+        "AForgeMode": {
+          "size": 1168,
+          "base": "AActor",
+          "fields": {
+            "OnSwordmakingStageChangedDelegate": {
+              "offset": 688,
+              "size": 16
+            },
+            "RotationPivot": {
+              "offset": 720,
+              "size": 8
+            },
+            "TranslationPivot": {
+              "offset": 728,
+              "size": 8
+            },
+            "MaterialParameterCollection": {
+              "offset": 736,
+              "size": 8
+            },
+            "ApparentCenterOfRotation": {
+              "offset": 744,
+              "size": 4
+            },
+            "BaseMomentOfInertia": {
+              "offset": 748,
+              "size": 4
+            },
+            "ForgeModeFrontendClass": {
+              "offset": 752,
+              "size": 8
+            },
+            "ForgeModeFrontend": {
+              "offset": 760,
+              "size": 8
+            },
+            "BladeMeshClass": {
+              "offset": 768,
+              "size": 8
+            },
+            "BladeMesh": {
+              "offset": 776,
+              "size": 8
+            },
+            "TutorialBladeShapeClass": {
+              "offset": 784,
+              "size": 8
+            },
+            "TutorialBladeShape": {
+              "offset": 792,
+              "size": 8
+            },
+            "RootSwordPartActor": {
+              "offset": 800,
+              "size": 8
+            },
+            "PreviewImageCaptureClass": {
+              "offset": 808,
+              "size": 8
+            },
+            "PreviewImageCapture": {
+              "offset": 816,
+              "size": 8
+            },
+            "SwordOutlineCaptureClass": {
+              "offset": 824,
+              "size": 8
+            },
+            "SwordOutlineCapture": {
+              "offset": 832,
+              "size": 8
+            },
+            "SwordOutlineMatchTrait": {
+              "offset": 840,
+              "size": 8
+            },
+            "bSupressFrontendUpdate": {
+              "offset": 880,
+              "size": 1
+            },
+            "Environments": {
+              "offset": 896,
+              "size": 16
+            },
+            "BackDropLightEnvironments": {
+              "offset": 912,
+              "size": 16
+            },
+            "LightEnvironments": {
+              "offset": 928,
+              "size": 16
+            },
+            "CurrentEnvironment": {
+              "offset": 944,
+              "size": 8
+            },
+            "LoadingEnvironment": {
+              "offset": 960,
+              "size": 8
+            },
+            "CurrentLightEnvironment": {
+              "offset": 968,
+              "size": 8
+            },
+            "LoadingLightEnvironment": {
+              "offset": 976,
+              "size": 8
+            },
+            "Piece": {
+              "offset": 984,
+              "size": 8
+            },
+            "PommelPosition": {
+              "offset": 992,
+              "size": 24
+            },
+            "bFinalPiecePresentationEnabled": {
+              "offset": 1016,
+              "size": 1
+            },
+            "CamSpeed": {
+              "offset": 1020,
+              "size": 4
+            },
+            "StartCamTransform": {
+              "offset": 1024,
+              "size": 40
+            },
+            "EndCamTransform": {
+              "offset": 1064,
+              "size": 40
+            },
+            "FinalPiecePresentationLightEnvironment": {
+              "offset": 1104,
+              "size": 40
+            },
+            "SwordmakingStages": {
+              "offset": 1152,
+              "size": 16
+            }
+          }
+        }
+      },
+      "layout_evidence": "UE4SS generated Bladesong.hpp declarations for Steam build 25431485; does not validate native behavior"
+    }
+  }
+}

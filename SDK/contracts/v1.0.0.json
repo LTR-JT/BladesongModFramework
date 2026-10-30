@@ -1,0 +1,446 @@
+[
+  {
+    "name": "GetFrameworkVersion",
+    "parameters": [],
+    "returns": "string",
+    "description": "Runtime semantic version",
+    "errors": "None",
+    "since": "1.0.0",
+    "builds": "Reflected APIs require their capability; native helpers require exact fingerprint. Main baseline known; framework branch testing tracked separately.",
+    "example": "Framework.GetFrameworkVersion()",
+    "limitations": "Game references are transient. Reacquire after transitions. Public SDK 1.0 contract is preview until live migration passes.",
+    "parameter_types": {}
+  },
+  {
+    "name": "GetAPIVersion",
+    "parameters": [],
+    "returns": "string",
+    "description": "Stable public API semantic version",
+    "errors": "None",
+    "since": "1.0.0",
+    "builds": "Reflected APIs require their capability; native helpers require exact fingerprint. Main baseline known; framework branch testing tracked separately.",
+    "example": "Framework.GetAPIVersion()",
+    "limitations": "Game references are transient. Reacquire after transitions. Public SDK 1.0 contract is preview until live migration passes.",
+    "parameter_types": {}
+  },
+  {
+    "name": "GetGameVersion",
+    "parameters": [],
+    "returns": "string",
+    "description": "Detected Steam build or executable version; unknown before identification",
+    "errors": "None",
+    "since": "1.0.0",
+    "builds": "Reflected APIs require their capability; native helpers require exact fingerprint. Main baseline known; framework branch testing tracked separately.",
+    "example": "Framework.GetGameVersion()",
+    "limitations": "Game references are transient. Reacquire after transitions. Public SDK 1.0 contract is preview until live migration passes.",
+    "parameter_types": {}
+  },
+  {
+    "name": "GetGameBranch",
+    "parameters": [],
+    "returns": "string",
+    "description": "main only with matching local Steam public-branch evidence; otherwise unknown",
+    "errors": "None",
+    "since": "1.0.0",
+    "builds": "Reflected APIs require their capability; native helpers require exact fingerprint. Main baseline known; framework branch testing tracked separately.",
+    "example": "Framework.GetGameBranch()",
+    "limitations": "Game references are transient. Reacquire after transitions. Public SDK 1.0 contract is preview until live migration passes.",
+    "parameter_types": {}
+  },
+  {
+    "name": "GetCompatibilityProfile",
+    "parameters": [],
+    "returns": "string",
+    "description": "Active fingerprint/capability profile; not a promise of universal compatibility",
+    "errors": "None",
+    "since": "1.0.0",
+    "builds": "Reflected APIs require their capability; native helpers require exact fingerprint. Main baseline known; framework branch testing tracked separately.",
+    "example": "Framework.GetCompatibilityProfile()",
+    "limitations": "Game references are transient. Reacquire after transitions. Public SDK 1.0 contract is preview until live migration passes.",
+    "parameter_types": {}
+  },
+  {
+    "name": "IsReady",
+    "parameters": [],
+    "returns": "boolean",
+    "description": "Broker initialization readiness, not every capability",
+    "errors": "None",
+    "since": "1.0.0",
+    "builds": "Reflected APIs require their capability; native helpers require exact fingerprint. Main baseline known; framework branch testing tracked separately.",
+    "example": "Framework.IsReady()",
+    "limitations": "Game references are transient. Reacquire after transitions. Public SDK 1.0 contract is preview until live migration passes.",
+    "parameter_types": {}
+  },
+  {
+    "name": "HasCapability",
+    "parameters": [
+      "name"
+    ],
+    "returns": "boolean",
+    "description": "Probe a named reflected interface or exact native PCL fingerprint",
+    "errors": "Unknown capability returns false",
+    "since": "1.0.0",
+    "builds": "Reflected APIs require their capability; native helpers require exact fingerprint. Main baseline known; framework branch testing tracked separately.",
+    "example": "Framework.HasCapability(\"forge.read\")",
+    "limitations": "Game references are transient. Reacquire after transitions. Public SDK 1.0 contract is preview until live migration passes.",
+    "parameter_types": {
+      "name": "string"
+    }
+  },
+  {
+    "name": "ResolveObject",
+    "parameters": [
+      "name"
+    ],
+    "returns": "UObject|nil, string|nil",
+    "description": "Resolve a centralized object alias",
+    "errors": "nil,error for unavailable/unknown alias",
+    "since": "1.0.0",
+    "builds": "Reflected APIs require their capability; native helpers require exact fingerprint. Main baseline known; framework branch testing tracked separately.",
+    "example": "Framework.ResolveObject(\"utils\")",
+    "limitations": "Game references are transient. Reacquire after transitions. Public SDK 1.0 contract is preview until live migration passes.",
+    "parameter_types": {
+      "name": "string"
+    }
+  },
+  {
+    "name": "ResolveClass",
+    "parameters": [
+      "name"
+    ],
+    "returns": "UClass|nil, string|nil",
+    "description": "Resolve a centralized class alias",
+    "errors": "nil,error for unavailable/unknown alias",
+    "since": "1.0.0",
+    "builds": "Reflected APIs require their capability; native helpers require exact fingerprint. Main baseline known; framework branch testing tracked separately.",
+    "example": "Framework.ResolveClass(\"sword\")",
+    "limitations": "Game references are transient. Reacquire after transitions. Public SDK 1.0 contract is preview until live migration passes.",
+    "parameter_types": {
+      "name": "string"
+    }
+  },
+  {
+    "name": "GetGameState",
+    "parameters": [
+      "context"
+    ],
+    "returns": "UObject|nil, string|nil",
+    "description": "Read current BladesongGameState on game thread",
+    "errors": "nil,error if unavailable",
+    "since": "1.0.0",
+    "builds": "Reflected APIs require their capability; native helpers require exact fingerprint. Main baseline known; framework branch testing tracked separately.",
+    "example": "Framework.GetGameState()",
+    "limitations": "Game references are transient. Reacquire after transitions. Public SDK 1.0 contract is preview until live migration passes.",
+    "parameter_types": {
+      "context": "UObject|nil"
+    }
+  },
+  {
+    "name": "GetGameMode",
+    "parameters": [
+      "context"
+    ],
+    "returns": "UObject|nil, string|nil",
+    "description": "Read current BladesongGameMode on game thread",
+    "errors": "nil,error if unavailable",
+    "since": "1.0.0",
+    "builds": "Reflected APIs require their capability; native helpers require exact fingerprint. Main baseline known; framework branch testing tracked separately.",
+    "example": "Framework.GetGameMode()",
+    "limitations": "Game references are transient. Reacquire after transitions. Public SDK 1.0 contract is preview until live migration passes.",
+    "parameter_types": {
+      "context": "UObject|nil"
+    }
+  },
+  {
+    "name": "GetForge",
+    "parameters": [
+      "context"
+    ],
+    "returns": "UObject|nil, string|nil",
+    "description": "Read currently active native Forge through compatibility mapping",
+    "errors": "nil,error when Forge is closed",
+    "since": "1.0.0",
+    "builds": "Reflected APIs require their capability; native helpers require exact fingerprint. Main baseline known; framework branch testing tracked separately.",
+    "example": "Framework.GetForge()",
+    "limitations": "Game references are transient. Reacquire after transitions. Public SDK 1.0 contract is preview until live migration passes.",
+    "parameter_types": {
+      "context": "UObject|nil"
+    }
+  },
+  {
+    "name": "GetCurrentSword",
+    "parameters": [
+      "context"
+    ],
+    "returns": "UPiece|nil, string|nil",
+    "description": "Read Forge UPiece through mapped getter",
+    "errors": "nil,error outside Forge or missing interface",
+    "since": "1.0.0",
+    "builds": "Reflected APIs require their capability; native helpers require exact fingerprint. Main baseline known; framework branch testing tracked separately.",
+    "example": "Framework.GetCurrentSword()",
+    "limitations": "Game references are transient. Reacquire after transitions. Public SDK 1.0 contract is preview until live migration passes.",
+    "parameter_types": {
+      "context": "UObject|nil"
+    }
+  },
+  {
+    "name": "GetSwordDesign",
+    "parameters": [
+      "sword"
+    ],
+    "returns": "FWeaponDesignDefinition|nil, string|nil",
+    "description": "Read the native FWeaponDesignDefinition view for a valid UPiece; reacquire it after transitions.",
+    "errors": "nil,error for invalid sword or unavailable struct",
+    "since": "1.0.0",
+    "builds": "Reflected APIs require their capability; native helpers require exact fingerprint. Main baseline known; framework branch testing tracked separately.",
+    "example": "Framework.GetSwordDesign(sword)",
+    "limitations": "Game references are transient. Reacquire after transitions. Public SDK 1.0 contract is preview until live migration passes.",
+    "parameter_types": {
+      "sword": "UPiece"
+    }
+  },
+  {
+    "name": "RegisterMod",
+    "parameters": [
+      "metadata"
+    ],
+    "returns": "boolean",
+    "description": "Publish bounded serializable registration metadata",
+    "errors": "Assertion for malformed id/version/API/JSON or missing UE4SS ModRef",
+    "since": "1.0.0",
+    "builds": "Reflected APIs require their capability; native helpers require exact fingerprint. Main baseline known; framework branch testing tracked separately.",
+    "example": "Framework.RegisterMod{ id=\"Hello\", name=\"Hello\", version=\"1.0.0\", api=\"^1.0.0\" }",
+    "limitations": "Game references are transient. Reacquire after transitions. Public SDK 1.0 contract is preview until live migration passes.",
+    "parameter_types": {
+      "metadata": "BMFModMetadata"
+    }
+  },
+  {
+    "name": "RegisterPage",
+    "parameters": [
+      "id",
+      "definition",
+      "callback"
+    ],
+    "returns": "boolean",
+    "description": "Register local callback and serialized menu metadata; functions stay local",
+    "errors": "Assertion when mod is not registered or callback/definition invalid",
+    "since": "1.0.0",
+    "builds": "Reflected APIs require their capability; native helpers require exact fingerprint. Main baseline known; framework branch testing tracked separately.",
+    "example": "Framework.RegisterPage(\"info\", {title=\"Info\"}, function() print(\"Opened\") end)",
+    "limitations": "Game references are transient. Reacquire after transitions. Public SDK 1.0 contract is preview until live migration passes.",
+    "parameter_types": {
+      "id": "string",
+      "definition": "table",
+      "callback": "function"
+    }
+  },
+  {
+    "name": "Poll",
+    "parameters": [],
+    "returns": "nil",
+    "description": "Process one pending local page command; call from your game-thread lifecycle tick",
+    "errors": "Callback errors recorded in diagnostics",
+    "since": "1.0.0",
+    "builds": "Reflected APIs require their capability; native helpers require exact fingerprint. Main baseline known; framework branch testing tracked separately.",
+    "example": "Framework.Poll()",
+    "limitations": "Game references are transient. Reacquire after transitions. Public SDK 1.0 contract is preview until live migration passes.",
+    "parameter_types": {}
+  },
+  {
+    "name": "SendPage",
+    "parameters": [
+      "mod",
+      "page"
+    ],
+    "returns": "boolean",
+    "description": "Send serializable page-open command to registered mod context",
+    "errors": "Assertion on invalid argument type; one pending command per mod",
+    "since": "1.0.0",
+    "builds": "Reflected APIs require their capability; native helpers require exact fingerprint. Main baseline known; framework branch testing tracked separately.",
+    "example": "Framework.SendPage(\"Hello\", \"info\")",
+    "limitations": "Game references are transient. Reacquire after transitions. Public SDK 1.0 contract is preview until live migration passes.",
+    "parameter_types": {
+      "mod": "string",
+      "page": "string"
+    }
+  },
+  {
+    "name": "GetRegisteredMods",
+    "parameters": [],
+    "returns": "table[]",
+    "description": "Read registered metadata with dependency/capability failures",
+    "errors": "Malformed remote registrations ignored",
+    "since": "1.0.0",
+    "builds": "Reflected APIs require their capability; native helpers require exact fingerprint. Main baseline known; framework branch testing tracked separately.",
+    "example": "Framework.GetRegisteredMods()",
+    "limitations": "Game references are transient. Reacquire after transitions. Public SDK 1.0 contract is preview until live migration passes.",
+    "parameter_types": {}
+  },
+  {
+    "name": "ExportDiagnostics",
+    "parameters": [
+      "path"
+    ],
+    "returns": "boolean",
+    "description": "Export minimal diagnostic JSON; caller supplies a diagnostics*.json path",
+    "errors": "Assertion on path suffix/file I/O failure",
+    "since": "1.0.0",
+    "builds": "Reflected APIs require their capability; native helpers require exact fingerprint. Main baseline known; framework branch testing tracked separately.",
+    "example": "Framework.ExportDiagnostics(\"diagnostics.json\")",
+    "limitations": "Game references are transient. Reacquire after transitions. Public SDK 1.0 contract is preview until live migration passes.",
+    "parameter_types": {
+      "path": "string"
+    }
+  },
+  {
+    "name": "GetSettings",
+    "parameters": [
+      "id"
+    ],
+    "returns": "table",
+    "description": "Read serialized registered mod settings; use schema defaults when absent",
+    "errors": "Assertion on invalid mod id",
+    "since": "1.0.0",
+    "builds": "Reflected APIs require their capability; native helpers require exact fingerprint. Main baseline known; framework branch testing tracked separately.",
+    "example": "Framework.GetSettings(\"Hello\")",
+    "limitations": "Game references are transient. Reacquire after transitions. Public SDK 1.0 contract is preview until live migration passes.",
+    "parameter_types": {
+      "id": "string"
+    }
+  },
+  {
+    "name": "SetSetting",
+    "parameters": [
+      "id",
+      "key",
+      "value"
+    ],
+    "returns": "boolean",
+    "description": "Type-check and save registered setting through broker persistence",
+    "errors": "Assertion for unknown setting or incorrect type",
+    "since": "1.0.0",
+    "builds": "Reflected APIs require their capability; native helpers require exact fingerprint. Main baseline known; framework branch testing tracked separately.",
+    "example": "Framework.SetSetting(\"Hello\", \"enabled\", true)",
+    "limitations": "Game references are transient. Reacquire after transitions. Public SDK 1.0 contract is preview until live migration passes.",
+    "parameter_types": {
+      "id": "string",
+      "key": "string",
+      "value": "boolean|number|string|table"
+    }
+  },
+  {
+    "name": "Ready",
+    "parameters": [
+      "callback"
+    ],
+    "returns": "nil",
+    "description": "Wait on bounded-frequency game-thread timer for broker readiness",
+    "errors": "Assertion without scheduler; callback stays in caller state",
+    "since": "1.0.0",
+    "builds": "Reflected APIs require their capability; native helpers require exact fingerprint. Main baseline known; framework branch testing tracked separately.",
+    "example": "Framework.Ready(function() print(\"Framework ready\") end)",
+    "limitations": "Game references are transient. Reacquire after transitions. Public SDK 1.0 contract is preview until live migration passes.",
+    "parameter_types": {
+      "callback": "function"
+    }
+  },
+  {
+    "name": "GetNativeHelper",
+    "parameters": [
+      "name",
+      "directory"
+    ],
+    "returns": "string|nil, string|nil",
+    "description": "Resolve PCL helper only on exact supported executable fingerprint",
+    "errors": "nil,error on unknown native build; malformed names assert",
+    "since": "1.0.0",
+    "builds": "Reflected APIs require their capability; native helpers require exact fingerprint. Main baseline known; framework branch testing tracked separately.",
+    "example": "Framework.GetNativeHelper(\"pcl_local_cache_151733.dll\", scripts_dir)",
+    "limitations": "Game references are transient. Reacquire after transitions. Public SDK 1.0 contract is preview until live migration passes.",
+    "parameter_types": {
+      "name": "string",
+      "directory": "string"
+    }
+  },
+  {
+    "name": "Subscribe",
+    "parameters": [
+      "event",
+      "callback"
+    ],
+    "returns": "boolean|nil, string|nil",
+    "description": "Subscribe once per client instance to a mapped Forge lifecycle event; callback remains local.",
+    "errors": "nil,error for unsupported capability/invalid input; bad callback type asserts",
+    "since": "1.0.0",
+    "builds": "Capability-probed reflected APIs. Unknown builds remain unverified.",
+    "example": "Framework.Subscribe(\"forge_enter\", function() print(\"Forge entered\") end)",
+    "limitations": "Game-thread callers only. Presentation transforms do not imply persistent construction edits. Examples require a real current component/transform, not a fabricated sword array.",
+    "parameter_types": {
+      "event": "string",
+      "callback": "function"
+    }
+  },
+  {
+    "name": "SetComponentTransform",
+    "parameters": [
+      "component",
+      "transform"
+    ],
+    "returns": "boolean|nil, string|nil",
+    "description": "Set a validated SceneComponent presentation transform. This does not serialize a sword design or commit part edits.",
+    "errors": "nil,error for unsupported capability/invalid input; bad callback type asserts",
+    "since": "1.0.0",
+    "builds": "Capability-probed reflected APIs. Unknown builds remain unverified.",
+    "example": "local ok, error = Framework.SetComponentTransform(component, transform)",
+    "limitations": "Game-thread callers only. Presentation transforms do not imply persistent construction edits. Examples require a real current component/transform, not a fabricated sword array.",
+    "parameter_types": {
+      "component": "USceneComponent",
+      "transform": "table"
+    }
+  },
+  {
+    "name": "GetSwordComponents",
+    "parameters": [
+      "sword"
+    ],
+    "parameter_types": {
+      "sword": "UPiece"
+    },
+    "returns": "ASwordPartActor[]|nil, string|nil",
+    "description": "Traverse the active Forge root part, slot children and free children with cycle/size guards. Refs stay local and transient.",
+    "errors": "nil,error outside active Forge or if part traversal is unsupported",
+    "since": "1.0.0",
+    "builds": "Requires forge.parts reflected capability and the currently active UPiece.",
+    "example": "local parts, error = Framework.GetSwordComponents(sword)",
+    "limitations": "Returns current part actors, not a persistent snapshot or blade mesh. Reacquire after transitions; do not hold native pointers in asynchronous jobs."
+  },
+  {
+    "name": "OpenCreativeLibrary",
+    "parameters": [],
+    "parameter_types": {},
+    "returns": "boolean|nil, string|nil",
+    "description": "Invoke native Creative Mode navigation from the existing main menu; does not choose a sword or load Forge.",
+    "errors": "nil,error when main menu/native button capability unavailable",
+    "since": "1.0.0",
+    "builds": "Requires native CommonButtonBase click capability and live WBP_MainMenu.",
+    "example": "local ok, error = Framework.OpenCreativeLibrary()",
+    "limitations": "Game-thread UI call; navigation completes asynchronously. No guarantee that a particular feature panel is ready immediately."
+  },
+  {
+    "name": "GetCompatibilityData",
+    "parameters": [
+      "mod_id"
+    ],
+    "parameter_types": {
+      "mod_id": "string|nil"
+    },
+    "returns": "table",
+    "description": "Returns a detached copy of selected executable patch metadata, or data scoped to a mod ID.",
+    "errors": "Invalid mod ID raises an error; unknown executables return an unknown profile and empty mod data.",
+    "since": "1.0.0",
+    "builds": "Exact SHA256 selects Main or Bleeding Edge patch packs. Branch labels alone never select native patches.",
+    "example": "local patch = Framework.GetCompatibilityData()\nlocal own = Framework.GetCompatibilityData(\"ExampleMod\")",
+    "limitations": "Native helpers must be explicitly verified for the selected executable. Metadata identification does not certify gameplay behavior."
+  }
+]

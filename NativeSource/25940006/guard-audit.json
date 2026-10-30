@@ -1,0 +1,327 @@
+{
+  "format": 1,
+  "sha256": "ab7ef68cf68f04fd8a405e437eec49b979f1f225ac4a799827ba27c776b4721e",
+  "image_size": "0x90a6000",
+  "sources": [
+    {
+      "source": "pcl_blade_library_151761.cpp",
+      "checks": [
+        {
+          "name": "guard_tree",
+          "rva": "0x45C71E0",
+          "expected": "40555356574154415541564157488dac2408",
+          "actual": "40555356574154415541564157488dac2408",
+          "match": true
+        },
+        {
+          "name": "guard_send",
+          "rva": "0x46523F0",
+          "expected": "48895c2410488974241848897c2420554156",
+          "actual": "48895c2410488974241848897c2420554156",
+          "match": true
+        },
+        {
+          "name": "guard_weak",
+          "rva": "0x14991E0",
+          "expected": "40534883ec20488b",
+          "actual": "40534883ec20488b",
+          "match": true
+        },
+        {
+          "name": "guard_send_piece",
+          "rva": "0x4652434",
+          "expected": "488b892803000048",
+          "actual": "488b892803000048",
+          "match": true
+        },
+        {
+          "name": "guard_index_write",
+          "rva": "0x45C7270",
+          "expected": "89b3cc020000488b",
+          "actual": "89b3cc020000488b",
+          "match": true
+        },
+        {
+          "name": "guard_tree_call",
+          "rva": "0x45C7648",
+          "expected": "e893fbffff4c8b9b",
+          "actual": "e893fbffff4c8b9b",
+          "match": true
+        },
+        {
+          "name": "guard_copy",
+          "rva": "0x4540CA0",
+          "expected": "48895c240848896c24104889742418574156",
+          "actual": "48895c240848896c24104889742418574156",
+          "match": true
+        },
+        {
+          "name": "cache_save",
+          "rva": "0x45A3B90",
+          "expected": "48895c241848896c24204889542410565741564883ec4048",
+          "actual": "48895c241848896c24204889542410565741564883ec4048",
+          "match": true
+        },
+        {
+          "name": "cache_grow",
+          "rva": "0x10EE5E0",
+          "expected": "488974241848897c24204154415641574883ec30418b314d",
+          "actual": "488974241848897c24204154415641574883ec30418b314d",
+          "match": true
+        },
+        {
+          "name": "cache_rebuild",
+          "rva": "0x45B77E0",
+          "expected": "488bc44889581048897018488978205541564157488d68c8",
+          "actual": "488bc44889581048897018488978205541564157488d68c8",
+          "match": true
+        },
+        {
+          "name": "cache_decode",
+          "rva": "0x11DB7A0",
+          "expected": "48895c240848896c24104889742418574883ec30410fb6e8",
+          "actual": "48895c240848896c24104889742418574883ec30410fb6e8",
+          "match": true
+        },
+        {
+          "name": "cache_load",
+          "rva": "0x45BA560",
+          "expected": "48895c241048896c24184889742420574883ec20488bd9488bfa4883c130e81d",
+          "actual": "48895c241048896c24184889742420574883ec20488bd9488bfa4883c130e81d",
+          "match": true
+        },
+        {
+          "name": "blade_tick_guard",
+          "rva": "0x458E9B0",
+          "expected": "40534883ec20488bd9e832f6e9fe488b83080300004885c074348b40080fbae01e722b0fb683100300003cff7420488b93080300003c01488bcb410f94c04883c230e899e2ffffc683100300",
+          "actual": "40534883ec20488bd9e832f6e9fe488b83080300004885c074348b40080fbae01e722b0fb683100300003cff7420488b93080300003c01488bcb410f94c04883c230e899e2ffffc683100300",
+          "match": true
+        },
+        {
+          "name": "blade_update_guard",
+          "rva": "0x458CC90",
+          "expected": "48895c242044884424184889542410555657415441554156",
+          "actual": "48895c242044884424184889542410555657415441554156",
+          "match": true
+        }
+      ],
+      "all_recorded_guards_match": true
+    },
+    {
+      "source": "pcl_local_cache_151733.cpp",
+      "checks": [
+        {
+          "name": "guard_tree",
+          "rva": "0x45C71E0",
+          "expected": "40555356574154415541564157488dac2408",
+          "actual": "40555356574154415541564157488dac2408",
+          "match": true
+        },
+        {
+          "name": "guard_send",
+          "rva": "0x46523F0",
+          "expected": "48895c2410488974241848897c2420554156",
+          "actual": "48895c2410488974241848897c2420554156",
+          "match": true
+        },
+        {
+          "name": "guard_weak",
+          "rva": "0x14991E0",
+          "expected": "40534883ec20488b",
+          "actual": "40534883ec20488b",
+          "match": true
+        },
+        {
+          "name": "guard_send_piece",
+          "rva": "0x4652434",
+          "expected": "488b892803000048",
+          "actual": "488b892803000048",
+          "match": true
+        },
+        {
+          "name": "guard_index_write",
+          "rva": "0x45C7270",
+          "expected": "89b3cc020000488b",
+          "actual": "89b3cc020000488b",
+          "match": true
+        },
+        {
+          "name": "guard_tree_call",
+          "rva": "0x45C7648",
+          "expected": "e893fbffff4c8b9b",
+          "actual": "e893fbffff4c8b9b",
+          "match": true
+        },
+        {
+          "name": "guard_copy",
+          "rva": "0x4540CA0",
+          "expected": "48895c240848896c24104889742418574156",
+          "actual": "48895c240848896c24104889742418574156",
+          "match": true
+        },
+        {
+          "name": "cache_save",
+          "rva": "0x45A3B90",
+          "expected": "48895c241848896c24204889542410565741564883ec4048",
+          "actual": "48895c241848896c24204889542410565741564883ec4048",
+          "match": true
+        },
+        {
+          "name": "cache_grow",
+          "rva": "0x10EE5E0",
+          "expected": "488974241848897c24204154415641574883ec30418b314d",
+          "actual": "488974241848897c24204154415641574883ec30418b314d",
+          "match": true
+        },
+        {
+          "name": "cache_rebuild",
+          "rva": "0x45B77E0",
+          "expected": "488bc44889581048897018488978205541564157488d68c8",
+          "actual": "488bc44889581048897018488978205541564157488d68c8",
+          "match": true
+        },
+        {
+          "name": "cache_decode",
+          "rva": "0x11DB7A0",
+          "expected": "48895c240848896c24104889742418574883ec30410fb6e8",
+          "actual": "48895c240848896c24104889742418574883ec30410fb6e8",
+          "match": true
+        },
+        {
+          "name": "cache_load",
+          "rva": "0x45BA560",
+          "expected": "48895c241048896c24184889742420574883ec20488bd9488bfa4883c130e81d",
+          "actual": "48895c241048896c24184889742420574883ec20488bd9488bfa4883c130e81d",
+          "match": true
+        }
+      ],
+      "all_recorded_guards_match": true
+    },
+    {
+      "source": "pcl_download_capture_151762.cpp",
+      "checks": [
+        {
+          "name": "callback_prologue",
+          "rva": "0x463DB70",
+          "expected": "4055535657415441564157488dac24e0feffff",
+          "actual": "4055535657415441564157488dac24e0feffff",
+          "match": true
+        },
+        {
+          "name": "weak_assign_prologue",
+          "rva": "0x14991E0",
+          "expected": "40534883ec20488b12488bd94885d2741a",
+          "actual": "40534883ec20488b12488bd94885d2741a",
+          "match": true
+        },
+        {
+          "name": "weak_array_reference",
+          "rva": "0x14991F6",
+          "expected": "488d0d53b21b07e8fe19feff",
+          "actual": "488d0d53b21b07e8fe19feff",
+          "match": true
+        },
+        {
+          "name": "weak_serial_layout",
+          "rva": "0x147AC29",
+          "expected": "8b471085c0",
+          "actual": "8b471085c0",
+          "match": true
+        },
+        {
+          "name": "object_array_layout",
+          "rva": "0x147AC06",
+          "expected": "3b51247d1c4c8b4110448bca0fb7c249c1e910488d14404b8b04c8488d3cd0",
+          "actual": "3b51247d1c4c8b4110448bca0fb7c249c1e910488d14404b8b04c8488d3cd0",
+          "match": true
+        },
+        {
+          "name": "callback_widget",
+          "rva": "0x463DBA1",
+          "expected": "488bf94889542448",
+          "actual": "488bf94889542448",
+          "match": true
+        },
+        {
+          "name": "call_arguments",
+          "rva": "0x463DD7F",
+          "expected": "488bd6488bcb",
+          "actual": "488bd6488bcb",
+          "match": true
+        },
+        {
+          "name": "enter_prologue",
+          "rva": "0x45A8280",
+          "expected": "48895c241848896c2420565741544156",
+          "actual": "48895c241848896c2420565741544156",
+          "match": true
+        },
+        {
+          "name": "seam_prologue",
+          "rva": "0x45B77E0",
+          "expected": "488bc448895810488970184889782055",
+          "actual": "488bc448895810488970184889782055",
+          "match": true
+        },
+        {
+          "name": "piece_store",
+          "rva": "0x45B788F",
+          "expected": "4c89b6d8030000",
+          "actual": "4c89b6d8030000",
+          "match": true
+        },
+        {
+          "name": "forge_store",
+          "rva": "0x45A843B",
+          "expected": "48899d48040000",
+          "actual": "48899d48040000",
+          "match": true
+        },
+        {
+          "name": "factory_arguments",
+          "rva": "0x463DD1E",
+          "expected": "4533c0488d542460488bce",
+          "actual": "4533c0488d542460488bce",
+          "match": true
+        },
+        {
+          "name": "factory_prologue",
+          "rva": "0x45A3A40",
+          "expected": "48895c240848896c24104889742418574883ec20",
+          "actual": "48895c240848896c24104889742418574883ec20",
+          "match": true
+        },
+        {
+          "name": "new_piece_prologue",
+          "rva": "0x4593C10",
+          "expected": "40534881ecb0000000488b05e018f8034833c448",
+          "actual": "40534881ecb0000000488b05e018f8034833c448",
+          "match": true
+        },
+        {
+          "name": "load_piece_prologue",
+          "rva": "0x45BA560",
+          "expected": "48895c241048896c24184889742420574883ec20488bd948",
+          "actual": "48895c241048896c24184889742420574883ec20488bd948",
+          "match": true
+        },
+        {
+          "name": "factory_add_inventory",
+          "rva": "0x45A3A71",
+          "expected": "488b8cf538050000488bd7e86f49ffff",
+          "actual": "488b8cf538050000488bd7e86f49ffff",
+          "match": true
+        },
+        {
+          "name": "home_bound_layout",
+          "rva": "0x46208A2",
+          "expected": "4883b92803000000",
+          "actual": "4883b92803000000",
+          "match": true
+        }
+      ],
+      "all_recorded_guards_match": true
+    }
+  ],
+  "limitation": "Matching prologues alone do not establish ABI, object offsets, function semantics, or runtime compatibility. This audit never enables native code."
+}

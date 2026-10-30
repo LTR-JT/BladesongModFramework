@@ -1,0 +1,8 @@
+{
+  "id": "bleedingedge",
+  "identified_executables": [
+    "ab7ef68cf68f04fd8a405e437eec49b979f1f225ac4a799827ba27c776b4721e"
+  ],
+  "patch_pack": "../builds/bleedingedge-25940006.json",
+  "status": "Build identity and framework initialization observed; native helpers not verified"
+}

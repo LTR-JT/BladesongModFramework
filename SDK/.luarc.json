@@ -1,0 +1,19 @@
+{
+  "runtime.version": "Lua 5.4",
+  "workspace.library": [
+    "framework.d.lua"
+  ],
+  "diagnostics.globals": [
+    "ModRef",
+    "StaticFindObject",
+    "FindFirstOf",
+    "FindAllOf",
+    "StaticConstructObject",
+    "RegisterHook",
+    "RegisterKeyBind",
+    "ExecuteInGameThread",
+    "ExecuteInGameThreadWithDelay",
+    "ExecuteAsync",
+    "Key"
+  ]
+}
