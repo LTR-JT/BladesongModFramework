@@ -19,6 +19,12 @@ local confirm
 for _,action in pairs(M.actions)do if action.widget.caption=='Confirm install'then confirm=action end end
 assert(confirm,'Reviewed release has no confirmation button')
 confirm.callback();assert(jobs[#jobs].operation=='stage');jobs[#jobs].callback({status='complete',message='Staged'})
+local restart
+for _,entry in pairs(M.actions)do if entry.widget.caption=='Restart & Apply'then restart=entry end end
+assert(restart,'Staged browse installation has no apply control');restart.callback()
+local confirmation
+for _,entry in pairs(M.actions)do if entry.widget.caption=='Confirm saved - restart and apply'then confirmation=entry end end
+assert(confirmation,'Apply requires explicit saved-game confirmation')
 jobs={}
 M.registry:SetText('https://example.org/index.json')
 for _,action in pairs(M.actions)do if action.widget.caption=='Refresh catalogue'then action.callback();break end end

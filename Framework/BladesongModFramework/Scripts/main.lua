@@ -1,4 +1,4 @@
--- Bladesong Mod Framework 0.1.4. All UObject access stays on the game thread.
+-- Bladesong Mod Framework 0.1.5. All UObject access stays on the game thread.
 if BMF_RUNTIME_STARTED then return end
 BMF_RUNTIME_STARTED=true
 BMF_ROOT=debug.getinfo(1,'S').source:gsub('^@',''):match('^(.*[\\/])')..'../../shared/BladesongFramework/'
@@ -46,4 +46,4 @@ function BMF_RuntimeTick()
  ExecuteInGameThreadWithDelay(500,BMF_RuntimeTick)
 end
 ExecuteInGameThreadWithDelay(500,BMF_RuntimeTick)
-print('[BMF] Framework 0.1.4 initialized; API 1.0.0; branch identity is unknown until verified.\n')
+print('[BMF] Framework 0.1.5 initialized; API 1.0.0; branch identity is unknown until verified.\n')

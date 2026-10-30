@@ -1,6 +1,6 @@
-Bladesong Mod Framework 0.1.4
+Bladesong Mod Framework 0.1.5
 
-For the easiest installation, download **BladesongModFramework_0.1.4_Easy_Install_With_UE4SS.zip**.
+For the easiest installation, download **BladesongModFramework_0.1.5_Easy_Install_With_UE4SS.zip**.
 Close the game, Extract All, open the folder and double-click INSTALL.cmd. Press Enter, then start Bladesong and choose Mods above Options.
 
 - Includes the mod manager and the configured UE4SS runtime; debug windows are disabled.
@@ -11,3 +11,5 @@ Close the game, Extract All, open the folder and double-click INSTALL.cmd. Press
 - PCL 15.18.2 registers its library with that shared menu.
 
 Runtime.zip is for manual installation with existing compatible UE4SS. BMF.zip is for the in-game updater.
+
+0.1.5 also recognizes dependencies installed by copying files or using the easy installer, without requiring a previous in-game installation receipt.

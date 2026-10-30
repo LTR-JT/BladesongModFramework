@@ -170,13 +170,6 @@ function M.Render()
 
   end
 
-  action('Restart & Apply approved changes',function()
-
-   M.restart_review=not M.restart_review
-
-   if M.restart_review then line('Save any unsaved gameplay first. This closes Bladesong normally; staged changes apply only after it exits.');action('Confirm saved â€” restart and apply',function()M.Job('restart',{});M.quit_after_job=true end)end
-
-  end)
 
  elseif M.page=='settings'then
 
@@ -205,6 +198,13 @@ function M.Render()
  end
 
  if M.message then line(M.message)end
+ if M.staged or M.page=='updates'then
+  action('Restart & Apply',function()M.restart_review=not M.restart_review;M.Render()end)
+ end
+ if M.restart_review then
+  line('Save any unsaved gameplay first. This closes Bladesong normally and installs the staged files after it exits.')
+  action('Confirm saved - restart and apply',function()M.quit_after_job=true;M.Job('restart',{})end)
+ end
  M.rendering_content=false
  if M.page=='browse'and not M.browse_requested and not M.busy then M.RefreshCatalogue(plain(M.registry:GetText()))end
 
@@ -217,6 +217,8 @@ function M.Job(operation,args)
  local ok,err=pcall(function()F.StartJob(operation,args,function(result)
 
   M.busy=false;M.message=result.error or result.message or result.status
+  if operation=='stage'and result.status=='complete'then M.staged=true end
+  if result.status=='failed'then M.quit_after_job=false end
 
   if result.entries then M.browser=result.entries end;if result.mod then M.preview=result.mod end;if result.updates then M.updates=result.updates end
 

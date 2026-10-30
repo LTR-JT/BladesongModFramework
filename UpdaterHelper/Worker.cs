@@ -62,7 +62,7 @@ class Worker {
  static void Fetch(string url,string path,long limit=67108864,int timeout=30000){
   Uri u=Https(url);ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
   for(int hop=0;hop<6;hop++){
-   var r=(HttpWebRequest)WebRequest.Create(u);r.AllowAutoRedirect=false;r.UserAgent="BladesongModFramework/0.1.2";r.Timeout=timeout;r.ReadWriteTimeout=timeout;
+   var r=(HttpWebRequest)WebRequest.Create(u);r.AllowAutoRedirect=false;r.UserAgent="BladesongModFramework/0.1.5";r.Timeout=timeout;r.ReadWriteTimeout=timeout;
    string rate=Path.Combine(Data,"rate-"+TextHash(u.Host)+".json");lock(NetworkSync){if(File.Exists(rate)){DateTime until;if(DateTime.TryParse(S(Read(rate),"until"),out until)&&until.ToUniversalTime()>DateTime.UtcNow)throw new Exception("Provider rate limit cooldown; using cached metadata where available");}}
    HttpWebResponse received;try{received=(HttpWebResponse)r.GetResponse();}catch(WebException e){var failed=e.Response as HttpWebResponse;if(failed!=null){using(failed){if((int)failed.StatusCode==429||((int)failed.StatusCode==403&&(failed.Headers["X-RateLimit-Remaining"]=="0"||failed.Headers["Retry-After"]!=null))){int seconds;long reset;DateTime until=DateTime.UtcNow.AddMinutes(15);if(Int32.TryParse(failed.Headers["Retry-After"],out seconds))until=DateTime.UtcNow.AddSeconds(Math.Min(86400,Math.Max(1,seconds)));else if(Int64.TryParse(failed.Headers["X-RateLimit-Reset"],out reset))until=new DateTime(1970,1,1,0,0,0,DateTimeKind.Utc).AddSeconds(reset);lock(NetworkSync)Write(rate,Obj("until",until.ToString("o")));throw new Exception("Provider rate limit reached; cached metadata remains available");}}}throw;}
    using(var response=received){
@@ -151,10 +151,21 @@ class Worker {
   }Write(Path.Combine(Data,"identity.json"),result);return result;
  }
  static IEnumerable<string> Records(){return Directory.GetDirectories(ModsRoot).Select(d=>Path.Combine(d,"bmf-installed.json")).Where(File.Exists);}
+ static void Dependencies(object manifest){
+  if(G(manifest,"dependencies")==null)return;
+  foreach(var dependency in D(G(manifest,"dependencies"))){
+   Need(Regex.IsMatch(dependency.Key,@"^[A-Za-z0-9_-]{1,64}$"),"Invalid dependency ID");
+   string directory=Child(ModsRoot,dependency.Key),path=null;
+   foreach(string name in new[]{"mod.json","bmf-manifest.json","bmf-installed.json"}){string candidate=Child(directory,name);if(File.Exists(candidate)){path=candidate;break;}}
+   Need(path!=null,"Missing dependency "+dependency.Key);object installed=Read(path);Metadata(installed);
+   Need(S(installed,"id")==dependency.Key&&VersionOK(S(installed,"version"),Convert.ToString(dependency.Value)),"Incompatible dependency "+dependency.Key);
+   Need(Enabled(dependency.Key),"Disabled dependency "+dependency.Key);
+  }
+ }
  static void Stage(Source s,object args,object request,string work){
   object m=s.Manifest;Need(S(m,"id")==S(args,"expected_id")&&S(m,"version")==S(args,"expected_version"),"Source changed since review");
   if(S(args,"expected_manifest_sha256")!="")Need(S(args,"expected_manifest_sha256")==s.Digest,"Manifest changed since review");string compatible=Compatibility(m,request);Need(compatible=="framework-ready","Required API/capability or explicit raw integration support is unavailable: "+compatible);
-  if(G(m,"dependencies")!=null)foreach(var dep in D(G(m,"dependencies"))){string p=Child(ModsRoot,dep.Key+"/bmf-installed.json");Need(File.Exists(p)&&VersionOK(S(Read(p),"version"),Convert.ToString(dep.Value)),"Missing/incompatible dependency "+dep.Key);}
+  Dependencies(m);
   if(s.Archive==null){s.Archive=Path.Combine(work,"archive.zip");Fetch(S(G(m,"download"),"url"),s.Archive);Need(Hash(s.Archive)==S(G(m,"download"),"sha256").ToLowerInvariant(),"Archive hash mismatch");}
   string payload=StageArchive(s.Archive,m,work),manifest=Path.Combine(work,"manifest.json");Write(manifest,m);string pending=Path.Combine(Data,"pending.json");
   var plan=File.Exists(pending)?D(Read(pending)):Obj("schema_version",1,"id",Path.GetFileName(work),"approved",true,"relaunch",true,"items",new object[0]);
@@ -210,6 +221,7 @@ class Worker {
  static object Run(object request,string work){
   object args=G(request,"args",Obj());switch(S(request,"operation")){
    case "browse":return Browse(args,work);
+   case "validate-dependencies-local":Dependencies(Read(S(args,"path")));return Obj("status","complete");
    case "validate-index-local":Index(Read(S(args,"path")));return Obj("status","complete");
    case "compatibility-local":return Obj("status","complete","compatibility",Compatibility(Read(S(args,"path")),request));
    case "discover":{

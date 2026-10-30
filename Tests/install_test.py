@@ -21,6 +21,17 @@ class Installer(unittest.TestCase):
   plan=self.root/'plan.json';plan.write_text(json.dumps({'schema_version':1,'approved':True,'id':'test_install','relaunch':False,'items':[{'manifest':str(m),'payload':result['payload']}]}))
   result=self.job('apply',{'plan':str(plan)});self.assertEqual(result['status'],'complete',result)
   installed=self.scripts.parent.parent/'FixtureMod/Scripts/main.lua';self.assertEqual(installed.read_bytes(),b'print("fixture")')
+ def test_manual_dependency_manifest_and_disabled_state(self):
+  _,manifest=self.archive();metadata=json.loads(manifest.read_text());metadata['dependencies']={'BladesongModFramework':'^0.1.4'};manifest.write_text(json.dumps(metadata))
+  folder=self.scripts.parent;current={'schema_version':1,'id':'BladesongModFramework','name':'Framework','version':'0.1.5','api':'^1.0.0'}
+  (folder/'mod.json').write_text(json.dumps(current));(folder/'enabled.txt').write_text('')
+  self.assertEqual(self.job('validate-dependencies-local',{'path':str(manifest)})['status'],'complete')
+  (folder/'bmf-installed.json').write_text(json.dumps(dict(current,version='0.1.2')))
+  self.assertEqual(self.job('validate-dependencies-local',{'path':str(manifest)})['status'],'complete')
+  (folder/'enabled.txt').unlink()
+  self.assertEqual(self.job('validate-dependencies-local',{'path':str(manifest)})['status'],'failed')
+  current['version']='0.1.2';(folder/'mod.json').write_text(json.dumps(current));(folder/'enabled.txt').write_text('')
+  self.assertEqual(self.job('validate-dependencies-local',{'path':str(manifest)})['status'],'failed')
  def test_traversal_and_hash(self):
   for path in ['../outside.lua','Scripts/../outside.lua','C:/outside.lua','Scripts/main.lua:evil','Scripts/CON.lua']:
    p,m=self.archive(path);self.assertEqual(self.validate(p,m)['status'],'failed',path)
