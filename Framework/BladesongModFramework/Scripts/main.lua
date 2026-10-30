@@ -1,4 +1,4 @@
--- Bladesong Mod Framework 0.1.6. All UObject access stays on the game thread.
+-- Bladesong Mod Framework 0.1.7. All UObject access stays on the game thread.
 if BMF_RUNTIME_STARTED then return end
 BMF_RUNTIME_STARTED=true
 BMF_ROOT=debug.getinfo(1,'S').source:gsub('^@',''):match('^(.*[\\/])')..'../../shared/BladesongFramework/'
@@ -16,6 +16,7 @@ BMF_MANAGER=assert(loadfile(BMF_ROOT..'manager.lua'))(BMF,BMF_ROOT)
 BMF_MANAGER.PrimeCatalogue(BMF_MANAGER.default_index)
 BMF_CREATIVE=assert(loadfile(BMF_ROOT..'ui/creative_host.lua'))(BMF,BMF_ROOT)
 BMF.StartJob('discover',{},function(result)
+ if result.last_apply and result.last_apply.status=='failed'then BMF_MANAGER.message='Previous change could not be applied: '..tostring(result.last_apply.error);print('[BMF] '..BMF_MANAGER.message..'\n')end
  for _,metadata in ipairs(result.mods or {})do
   local id=metadata.id
   if id and id:match('^[%w_%-]+$')and not BMF._get('mod:'..id)then
@@ -48,4 +49,4 @@ function BMF_RuntimeTick()
  ExecuteInGameThreadWithDelay(500,BMF_RuntimeTick)
 end
 ExecuteInGameThreadWithDelay(500,BMF_RuntimeTick)
-print('[BMF] Framework 0.1.6 initialized; API 1.0.0; branch identity is unknown until verified.\n')
+print('[BMF] Framework 0.1.7 initialized; API 1.0.0; branch identity is unknown until verified.\n')

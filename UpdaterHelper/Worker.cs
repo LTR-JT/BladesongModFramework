@@ -62,7 +62,7 @@ class Worker {
  static void Fetch(string url,string path,long limit=67108864,int timeout=30000){
   Uri u=Https(url);ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
   for(int hop=0;hop<6;hop++){
-   var r=(HttpWebRequest)WebRequest.Create(u);r.AllowAutoRedirect=false;r.UserAgent="BladesongModFramework/0.1.6";r.Timeout=timeout;r.ReadWriteTimeout=timeout;
+   var r=(HttpWebRequest)WebRequest.Create(u);r.AllowAutoRedirect=false;r.UserAgent="BladesongModFramework/0.1.7";r.Timeout=timeout;r.ReadWriteTimeout=timeout;
    string rate=Path.Combine(Data,"rate-"+TextHash(u.Host)+".json");lock(NetworkSync){if(File.Exists(rate)){DateTime until;if(DateTime.TryParse(S(Read(rate),"until"),out until)&&until.ToUniversalTime()>DateTime.UtcNow)throw new Exception("Provider rate limit cooldown; using cached metadata where available");}}
    HttpWebResponse received;try{received=(HttpWebResponse)r.GetResponse();}catch(WebException e){var failed=e.Response as HttpWebResponse;if(failed!=null){using(failed){if((int)failed.StatusCode==429||((int)failed.StatusCode==403&&(failed.Headers["X-RateLimit-Remaining"]=="0"||failed.Headers["Retry-After"]!=null))){int seconds;long reset;DateTime until=DateTime.UtcNow.AddMinutes(15);if(Int32.TryParse(failed.Headers["Retry-After"],out seconds))until=DateTime.UtcNow.AddSeconds(Math.Min(86400,Math.Max(1,seconds)));else if(Int64.TryParse(failed.Headers["X-RateLimit-Reset"],out reset))until=new DateTime(1970,1,1,0,0,0,DateTimeKind.Utc).AddSeconds(reset);lock(NetworkSync)Write(rate,Obj("until",until.ToString("o")));throw new Exception("Provider rate limit reached; cached metadata remains available");}}}throw;}
    using(var response=received){
@@ -177,12 +177,47 @@ class Worker {
    Need(owned!=null&&Hash(destination)==S(owned,"sha256").ToLowerInvariant(),"Local edits preserved; refusing overwrite");
   }
  }
+ static Dictionary<string,object> PendingPlan(string work){
+  string path=Path.Combine(Data,"pending.json");Dictionary<string,object> plan=null;
+  if(File.Exists(path)){object previous=Read(path);if(Convert.ToBoolean(G(previous,"approved",false)))plan=D(previous);}
+  if(plan==null)plan=Obj("schema_version",1,"approved",true,"items",new object[0]);
+  if(S(plan,"id")=="")plan["id"]=Guid.NewGuid().ToString("N").Substring(0,12);
+  Need(Regex.IsMatch(S(plan,"id"),@"^[A-Za-z0-9_-]{1,80}$"),"Invalid pending transaction ID");
+  if(G(plan,"relaunch")==null)plan["relaunch"]=true;
+  return plan;
+ }
+ static bool GameRunning(string exe){
+  return Process.GetProcessesByName("Bladesong-Win64-Shipping").Any(p=>{try{return String.Equals(p.MainModule.FileName,exe,StringComparison.OrdinalIgnoreCase);}catch{return true;}finally{p.Dispose();}});
+ }
+ static string RemovalTarget(string id){
+  Need(Regex.IsMatch(id,@"^[A-Za-z0-9_-]{1,64}$")&&id!="BladesongModFramework","The framework cannot uninstall itself");
+  string root=Child(ModsRoot,id);Need(Directory.Exists(root),"Mod directory is unavailable");
+  foreach(string path in Records()){object mod=Read(path);if(S(mod,"id")!=id&&Enabled(S(mod,"id"))&&G(mod,"dependencies")!=null&&D(G(mod,"dependencies")).ContainsKey(id))throw new Exception("Enabled mod depends on this mod: "+S(mod,"id"));}
+  var pending=new Stack<string>();pending.Push(root);int count=0;
+  while(pending.Count>0){string directory=pending.Pop();foreach(string entry in Directory.EnumerateFileSystemEntries(directory)){
+   Need(++count<=50000,"Mod archive entry limit");FileAttributes flags=File.GetAttributes(entry);Need((flags&FileAttributes.ReparsePoint)==0,"Mod link/junction cannot be archived");if((flags&FileAttributes.Directory)!=0)pending.Push(entry);
+  }}return root;
+ }
+ static string UninstallArchive(object removal){
+  string token=S(removal,"archive");Need(Regex.IsMatch(token,@"^[a-f0-9]{12}$"),"Invalid uninstall archive token");
+  string root=Path.Combine(Path.GetDirectoryName(GameExe()),"BMF_Uninstalled");Directory.CreateDirectory(root);
+  Need((File.GetAttributes(root)&FileAttributes.ReparsePoint)==0,"Uninstall backup link rejected");return Child(root,token);
+ }
+ static void PrepareUninstall(object args,string work){
+  string id=S(args,"id");RemovalTarget(id);var plan=PendingPlan(work);string mods=Path.Combine(ModsRoot,"mods.txt");
+  var items=A(G(plan,"items")).Where(x=>S(Read(S(x,"manifest")),"id")!=id).ToList();
+  foreach(var item in items){object mod=Read(S(item,"manifest"));Need(G(mod,"dependencies")==null||!D(G(mod,"dependencies")).ContainsKey(id),"A pending install depends on this mod");}
+  plan["items"]=items;plan["toggles"]=A(G(plan,"toggles")).Where(x=>S(x,"id")!=id).ToArray();
+  var removals=A(G(plan,"removals")).Where(x=>S(x,"id")!=id).ToList();var removal=Obj("id",id,"archive",Guid.NewGuid().ToString("N").Substring(0,12),"mods_hash",File.Exists(mods)?Hash(mods):"");UninstallArchive(removal);removals.Add(removal);plan["removals"]=removals;
+  Write(Path.Combine(Data,"pending.json"),plan);
+ }
  static object Restart(){
   string pending=Path.Combine(Data,"pending.json");Need(File.Exists(pending)&&Convert.ToBoolean(G(Read(pending),"approved",false)),"No approved pending changes");
-  object plan=Read(pending);
+  object plan=PendingPlan(Data);Write(pending,plan);
   foreach(var item in A(G(plan,"items"))){object manifest=Read(S(item,"manifest"));Manifest(manifest);CheckTargets(manifest);
    foreach(var file in A(G(manifest,"files")))Need(Hash(Child(S(item,"payload"),S(file,"path")))==S(file,"sha256").ToLowerInvariant(),"Staged file changed");
   }
+  foreach(var removal in A(G(plan,"removals"))){RemovalTarget(S(removal,"id"));string mods=Path.Combine(ModsRoot,"mods.txt");Need((File.Exists(mods)?Hash(mods):"")==S(removal,"mods_hash"),"Load order changed since uninstall request");}
   foreach(var toggle in A(G(plan,"toggles"))){string mods=Path.Combine(ModsRoot,"mods.txt");Need((File.Exists(mods)?Hash(mods):"")==S(toggle,"mods_hash"),"Load order changed since approval");}
   string copy=Path.Combine(Data,"apply-"+Guid.NewGuid().ToString("N")+".exe");File.Copy(Process.GetCurrentProcess().MainModule.FileName,copy,false);
   string job=Path.Combine(Data,"apply-job-"+Guid.NewGuid().ToString("N")+".json");Write(job,Obj("id","apply_"+Guid.NewGuid().ToString("N"),"operation","apply","args",Obj("plan",pending),"framework_root",ModRoot));
@@ -194,7 +229,7 @@ class Worker {
   Dependencies(m);CheckTargets(m);
   if(s.Archive==null){s.Archive=Path.Combine(work,"archive.zip");Fetch(S(G(m,"download"),"url"),s.Archive);Need(Hash(s.Archive)==S(G(m,"download"),"sha256").ToLowerInvariant(),"Archive hash mismatch");}
   string payload=StageArchive(s.Archive,m,work),manifest=Path.Combine(work,"manifest.json");Write(manifest,m);string pending=Path.Combine(Data,"pending.json");
-  var plan=File.Exists(pending)?D(Read(pending)):Obj("schema_version",1,"id",Path.GetFileName(work),"approved",true,"relaunch",true,"items",new object[0]);
+  var plan=PendingPlan(work);
   var items=A(G(plan,"items")).Where(x=>S(Read(S(x,"manifest")),"id")!=S(m,"id")).ToList();items.Add(Obj("manifest",manifest,"payload",payload));plan["items"]=items;plan["approved"]=true;Write(pending,plan);
  }
  static string Target(object m,string rel){
@@ -209,25 +244,31 @@ class Worker {
   string id=S(args,"id");Need(Regex.IsMatch(id,@"^[A-Za-z0-9_-]{1,64}$")&&Directory.Exists(Child(ModsRoot,id)),"Unknown mod directory");Need(id!="BladesongModFramework","Disable dependent mods first; the framework cannot disable itself");
   bool enabled=Convert.ToBoolean(G(args,"enabled",!Enabled(id)));
   if(!enabled)foreach(string record in Records()){var m=Read(record);if(Enabled(S(m,"id"))&&G(m,"dependencies")!=null&&D(G(m,"dependencies")).ContainsKey(id))throw new Exception("Enabled dependency requires this mod: "+S(m,"id"));}
-  string pending=Path.Combine(Data,"pending.json"),mods=Path.Combine(ModsRoot,"mods.txt");var plan=File.Exists(pending)?D(Read(pending)):Obj("schema_version",1,"id",Path.GetFileName(work),"approved",true,"relaunch",true,"items",new object[0]);
+  string pending=Path.Combine(Data,"pending.json"),mods=Path.Combine(ModsRoot,"mods.txt");var plan=PendingPlan(work);
   var toggles=A(G(plan,"toggles")).Where(x=>S(x,"id")!=id).ToList();toggles.Add(Obj("id",id,"enabled",enabled,"mods_hash",File.Exists(mods)?Hash(mods):"","marker",File.Exists(Child(ModsRoot,id+"/enabled.txt"))));plan["toggles"]=toggles;plan["approved"]=true;Write(pending,plan);
  }
  static void Apply(string path){
   var plan=Read(path);Need(Convert.ToInt32(G(plan,"schema_version"))==1&&Convert.ToBoolean(G(plan,"approved",false)),"Unapproved plan");string exe=GameExe();
-  while(Process.GetProcessesByName("Bladesong-Win64-Shipping").Any(p=>{try{return p.MainModule.FileName==exe;}catch{return true;}finally{p.Dispose();}}))Thread.Sleep(1000);
+  while(GameRunning(exe))Thread.Sleep(1000);
   string transaction=Child(Path.Combine(Data,"rollback"),S(plan,"id"));Directory.CreateDirectory(transaction);var changes=new List<object>();
   using(var mutex=new Mutex(false,"Local\\BMFInstall_"+Hash(path).Substring(0,16))){Need(mutex.WaitOne(0),"Another transaction is active");try{
    // Prepare every backup before the first write, including installation records.
    foreach(var item in A(G(plan,"items"))){object m=Read(S(item,"manifest"));Manifest(m);string install=Child(ModsRoot,S(m,"id"));string record=Path.Combine(install,"bmf-installed.json");object old=File.Exists(record)?Read(record):null;
     foreach(var f in A(G(m,"files"))){string source=Child(S(item,"payload"),S(f,"path")),dest=Target(m,S(f,"path"));Need(Hash(source)==S(f,"sha256").ToLowerInvariant(),"Staged file changed");string backup=null;
-     if(File.Exists(dest)){Need(old!=null,"Unmanaged installation exists; manual migration required");var owned=A(G(old,"files")).FirstOrDefault(x=>S(x,"path")==S(f,"path"));Need(owned!=null&&Hash(dest)==S(owned,"sha256").ToLowerInvariant(),"Local edits preserved; refusing overwrite");backup=Child(transaction,S(m,"id")+"/"+S(f,"path"));Directory.CreateDirectory(Path.GetDirectoryName(backup));File.Copy(dest,backup,false);Need(Hash(dest)==Hash(backup),"Backup mismatch");}
+     if(File.Exists(dest)){Need(old!=null,"Unmanaged installation exists; manual migration required");var owned=A(G(old,"files")).FirstOrDefault(x=>S(x,"path")==S(f,"path"));Need(owned!=null&&Hash(dest)==S(owned,"sha256").ToLowerInvariant(),"Local edits preserved; refusing overwrite");backup=Child(transaction,"file_"+changes.Count+".bak");Directory.CreateDirectory(Path.GetDirectoryName(backup));File.Copy(dest,backup,false);Need(Hash(dest)==Hash(backup),"Backup mismatch");}
      changes.Add(Obj("destination",dest,"backup",backup,"source",source,"sha256",S(f,"sha256").ToLowerInvariant()));
     }
-    string recordSource=Path.Combine(transaction,S(m,"id")+".record.new.json");Write(recordSource,m);string recordBackup=null;if(File.Exists(record)){recordBackup=recordSource+".bak";File.Copy(record,recordBackup,false);}changes.Add(Obj("destination",record,"backup",recordBackup,"source",recordSource,"sha256",Hash(recordSource)));
+    string recordSource=Path.Combine(transaction,"record_"+changes.Count+".json");Write(recordSource,m);string recordBackup=null;if(File.Exists(record)){recordBackup=recordSource+".bak";File.Copy(record,recordBackup,false);}changes.Add(Obj("destination",record,"backup",recordBackup,"source",recordSource,"sha256",Hash(recordSource)));
    }
+   var removals=A(G(plan,"removals")).ToList();
+   foreach(var removal in removals){string id=S(removal,"id"),source=RemovalTarget(id),archive=UninstallArchive(removal);Need(!Directory.Exists(archive),"Uninstall archive already exists");changes.Add(Obj("destination",archive,"move_directory",source));}
    var toggles=A(G(plan,"toggles")).ToList();
-   if(toggles.Count>0){
+   if(toggles.Count>0||removals.Count>0){
     string mods=Path.Combine(ModsRoot,"mods.txt"),originalText=File.Exists(mods)?File.ReadAllText(mods):"";string edited=originalText;
+    foreach(var removal in removals){
+     Need((File.Exists(mods)?Hash(mods):"")==S(removal,"mods_hash"),"Load order changed since uninstall request");
+     edited=Regex.Replace(edited,@"(?m)^\s*"+Regex.Escape(S(removal,"id"))+@"\s*:\s*[01]\s*$","");
+    }
     foreach(var toggle in toggles){
      string id=S(toggle,"id");Need(Regex.IsMatch(id,@"^[A-Za-z0-9_-]{1,64}$")&&id!="BladesongModFramework","Invalid toggle target");Need((File.Exists(mods)?Hash(mods):"")==S(toggle,"mods_hash"),"Load order changed since approval");
      string line=id+" : "+(Convert.ToBoolean(G(toggle,"enabled"))?"1":"0");string pattern=@"(?m)^\s*"+Regex.Escape(id)+@"\s*:\s*[01]\s*$";
@@ -238,11 +279,33 @@ class Worker {
     string source=Path.Combine(transaction,"mods.new.txt");File.WriteAllText(source,edited,new UTF8Encoding(false));string old=null;if(File.Exists(mods)){old=Path.Combine(transaction,"mods.bak.txt");File.Copy(mods,old,false);}changes.Add(Obj("destination",mods,"backup",old,"source",source,"sha256",Hash(source)));
    }
    Write(Path.Combine(transaction,"journal.json"),Obj("status","prepared","changes",changes));var done=new List<object>();
-   try{foreach(var c in changes){Directory.CreateDirectory(Path.GetDirectoryName(S(c,"destination")));done.Add(c);Write(Path.Combine(transaction,"journal.json"),Obj("status","applying","changes",done));if(Convert.ToBoolean(G(c,"delete",false)))File.Delete(S(c,"destination"));else{File.Copy(S(c,"source"),S(c,"destination"),true);Need(Hash(S(c,"destination"))==S(c,"sha256"),"Installed hash mismatch");}}}
-   catch{for(int i=done.Count-1;i>=0;i--){var c=done[i];if(G(c,"backup")!=null)File.Copy(S(c,"backup"),S(c,"destination"),true);else File.Delete(S(c,"destination"));}Write(Path.Combine(transaction,"journal.json"),Obj("status","rolled_back","changes",done));throw;}
+   try{foreach(var c in changes){Directory.CreateDirectory(Path.GetDirectoryName(S(c,"destination")));done.Add(c);Write(Path.Combine(transaction,"journal.json"),Obj("status","applying","changes",done));if(G(c,"move_directory")!=null)Directory.Move(S(c,"move_directory"),S(c,"destination"));else if(Convert.ToBoolean(G(c,"delete",false)))File.Delete(S(c,"destination"));else{File.Copy(S(c,"source"),S(c,"destination"),true);Need(Hash(S(c,"destination"))==S(c,"sha256"),"Installed hash mismatch");}}}
+   catch{for(int i=done.Count-1;i>=0;i--){var c=done[i];if(G(c,"move_directory")!=null){if(Directory.Exists(S(c,"destination")))Directory.Move(S(c,"destination"),S(c,"move_directory"));}else if(G(c,"backup")!=null)File.Copy(S(c,"backup"),S(c,"destination"),true);else if(File.Exists(S(c,"destination")))File.Delete(S(c,"destination"));}Write(Path.Combine(transaction,"journal.json"),Obj("status","rolled_back","changes",done));throw;}
    Write(Path.Combine(transaction,"journal.json"),Obj("status","committed","changes",changes));Write(Path.Combine(Data,"pending.json"),Obj("schema_version",1,"approved",false,"items",new object[0]));
   }finally{mutex.ReleaseMutex();}}
-  if(Convert.ToBoolean(G(plan,"relaunch",false))&&File.Exists(exe))Process.Start(new ProcessStartInfo(exe){WorkingDirectory=Path.GetDirectoryName(exe)});
+
+ }
+ static object Updates(object request,string work){
+  var updates=new List<object>();var checks=Obj();var records=Records().ToArray();var sync=new object();
+  foreach(string path in records){object metadata=Read(path);checks[S(metadata,"id")]=Obj("state","checking");}
+  Action publish=()=>{try{Write(JobPath+".progress.json",Obj("checks",checks,"updates",updates.ToArray()));}catch(IOException){}catch(UnauthorizedAccessException){}};publish();
+  Parallel.ForEach(records,new ParallelOptions{MaxDegreeOfParallelism=4},path=>{
+   object old=Read(path);string id=S(old,"id");object check;
+   try{
+    if(S(old,"repository")=="")check=Obj("state","unavailable","message","No update source");
+    else if(S(old,"pinned_version")!="")check=Obj("state","pinned","message","Version pinned");
+    else{
+     string directory=Child(work,id);Directory.CreateDirectory(directory);Source source=Resolve(S(old,"repository"),directory,S(old,"channel")=="prerelease");
+     Need(S(source.Manifest,"id")==id,"Update release identity mismatch");
+     if(Version.Parse(S(source.Manifest,"version").Split('-')[0])>Version.Parse(S(old,"version").Split('-')[0])){
+      var metadata=D(source.Manifest);metadata["source"]=source.Url;metadata["manifest_sha256"]=source.Digest;metadata["compatibility"]=Compatibility(metadata,request);
+      lock(sync)updates.Add(metadata);check=Obj("state","update","version",S(metadata,"version"));
+     }else check=Obj("state","current");
+    }
+   }catch(Exception error){check=Obj("state","failed","message",error.Message);}
+   lock(sync){checks[id]=check;publish();}
+  });
+  return Obj("status","complete","checks",checks,"updates",updates.ToArray(),"message","Update check complete.");
  }
  static object Run(object request,string work){
   object args=G(request,"args",Obj());switch(S(request,"operation")){
@@ -256,7 +319,7 @@ class Worker {
      string record=Path.Combine(directory,"bmf-installed.json"),manifest=Path.Combine(directory,"mod.json");if(!File.Exists(manifest))manifest=Path.Combine(directory,"bmf-manifest.json");object m=null;try{m=File.Exists(record)?Read(record):File.Exists(manifest)?Read(manifest):null;if(m!=null){Metadata(m);Need(S(m,"id")==id,"Installed mod ID mismatch");D(m)["integration"]="manifest";}}catch(Exception e){m=Obj("id",id,"name",id,"version","0.0.0","api","^1.0.0","integration","invalid-manifest","description","Invalid manifest: "+e.Message);}
      if(m==null&&File.Exists(Path.Combine(directory,"Scripts/main.lua")))m=Obj("id",id,"name",id,"version","0.0.0","api","^1.0.0","description","Unmanaged UE4SS mod; version and compatibility unknown");
      if(m!=null){if(G(m,"integration")==null)D(m)["integration"]="ordinary";D(m)["enabled"]=Enabled(id);D(m)["discovered"]=true;mods.Add(m);}
-    }return Obj("status","complete","mods",mods);
+    }return Obj("status","complete","mods",mods,"last_apply",File.Exists(Path.Combine(Data,"last-apply.json"))?Read(Path.Combine(Data,"last-apply.json")):null);
    }
    case "list-saves":{
     string source=Path.GetFullPath(S(args,"source"));Need(Path.GetFileName(source)=="SaveGames","Expected SaveGames directory");
@@ -273,6 +336,7 @@ class Worker {
    }
    case "identify":return Obj("status","complete","identity",Identity());
    case "inspect":{Source s=Resolve(S(args,"url"),work);var m=D(s.Manifest);m["source"]=s.Url;m["manifest_sha256"]=s.Digest;m["compatibility"]=Compatibility(m,request);return Obj("status","complete","mod",m);}
+   case "uninstall":PrepareUninstall(args,work);return Restart();
    case "install":{
     Source source=Resolve(S(args,"url"),work);string expected=S(args,"expected_id");Need(expected==""||S(source.Manifest,"id")==expected,"Release identity differs from the selected mod");
     Stage(source,Obj("expected_id",S(source.Manifest,"id"),"expected_version",S(source.Manifest,"version"),"expected_manifest_sha256",source.Digest),request,work);
@@ -283,11 +347,19 @@ class Worker {
     return Restart();
    }
    case "stage":{Source s=Resolve(S(args,"source"),work);Stage(s,args,request,work);return Obj("status","complete","message","Validated and staged. Restart & Apply to install.");}
-   case "updates":{var updates=new List<object>();var errors=new List<string>();foreach(string p in Records()){object old=Read(p);if(S(old,"repository")==""||S(old,"pinned_version")!="")continue;try{string dir=Child(work,S(old,"id"));Directory.CreateDirectory(dir);Source s=Resolve(S(old,"repository"),dir,S(old,"channel")=="prerelease");if(Version.Parse(S(s.Manifest,"version").Split('-')[0])>Version.Parse(S(old,"version").Split('-')[0])){var m=D(s.Manifest);m["source"]=s.Url;m["manifest_sha256"]=s.Digest;m["compatibility"]=Compatibility(m,request);updates.Add(m);}}catch(Exception e){errors.Add(S(old,"id")+": "+e.Message);}}return Obj("status","complete","updates",updates,"message",String.Join("; ",errors));}
+   case "updates":return Updates(request,work);
    case "settings":Write(Path.Combine(Data,"settings.json"),G(args,"settings",Obj()));return Obj("status","complete","message","Settings saved");
    case "toggle":Toggle(args,work);return Obj("status","complete","message","Enable/disable queued for next launch; loaded code remains active until exit.");
    case "restart":return Restart();
-   case "apply":Apply(S(args,"plan"));return Obj("status","complete","message","Approved changes applied");
+   case "apply":{
+    string path=S(args,"plan");object plan=Read(path);Need(Convert.ToBoolean(G(plan,"approved",false)),"Unapproved plan");
+    object result;
+    try{Apply(path);result=Obj("status","complete","message","Approved changes applied");}
+    catch(Exception error){result=Obj("status","failed","error",error.Message);}
+    Write(Path.Combine(Data,"last-apply.json"),result);
+    if(Convert.ToBoolean(G(plan,"relaunch",false))){string exe=GameExe();if(File.Exists(exe)&&!GameRunning(exe))Process.Start(new ProcessStartInfo(exe){WorkingDirectory=Path.GetDirectoryName(exe)});}
+    return result;
+   }
    case "validate-local":return Obj("status","complete","payload",StageArchive(S(args,"archive"),Read(S(args,"manifest")),work));
    default:throw new Exception("Unsupported operation");
   }

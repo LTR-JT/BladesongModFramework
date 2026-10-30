@@ -55,12 +55,33 @@ function M.RefreshCatalogue(url,force)
  end)
 end
 function M.CheckUpdates()
- if M.update_checking then return end;M.update_checking=true
+ if M.update_checking then return end;M.update_checking=true;M.update_checks={};M.updates={}
+ for _,mod in ipairs(F.GetRegisteredMods())do M.update_checks[mod.id]={state='checking'}end
  if M.page=='installed'then M.Render()end
- F.StartJob('updates',{},function(result)
-  M.update_checking=false;M.updates=result.updates or {};M.update_message=result.error or (result.message and result.message~=''and result.message)or 'Update check complete.'
+ local function progress(result)
+  for id,check in pairs(result.checks or {})do M.update_checks[id]=check end
+  if result.updates then M.updates=result.updates end
   if M.page=='installed'and not M.busy then M.Render()end
- end)
+ end
+ F.StartJob('updates',{},function(result)
+  M.update_checking=false;M.updates=result.updates or {}
+  M.update_message=result.error or result.message or 'Update check complete.'
+  for id,check in pairs(M.update_checks)do
+   M.update_checks[id]=(result.checks or {})[id]or{state=result.status=='failed'and 'failed'or 'unavailable',message=result.error or 'No update source'}
+  end
+  for _,mod in ipairs(F.GetRegisteredMods())do if not M.update_checks[mod.id]then M.update_checks[mod.id]={state='unavailable',message='No update source'}end end
+  progress(result)
+ end,progress)
+end
+function M.UpdateStatus(mod)
+ local check=M.update_checks and M.update_checks[mod.id]
+ if not check then return 'Updates not checked yet'end
+ if check.state=='checking'then return 'Checking...'end
+ if check.state=='current'then return '✓ Up to date'end
+ if check.state=='update'then return 'Update available: '..tostring(check.version or '')end
+ if check.state=='pinned'then return 'Version pinned'end
+ if check.state=='failed'then return 'Check failed: '..tostring(check.message or 'Try again')end
+ return 'Update checks unavailable: '..tostring(check.message or 'No update source')
 end
 
 local function new(panel,kind)local o=StaticConstructObject(obj('/Script/UMG.'..kind),panel.WidgetTree);assert(valid(o),kind..' unavailable');return o end
@@ -165,11 +186,15 @@ function M.Render()
    if mod.integration=='ordinary'then line('Uses its own game interfaces; behavior has not been verified by the framework.',body,23)elseif mod.compatibility then line('Compatibility: '..mod.compatibility.state..' (behavior not automatically verified)',body,23)end
    for _,failure in ipairs(mod.failures or {})do line(failure,body,24)end
    for page,definition in pairs(mod.pages or {})do action(definition.title or page,function()M.Close();F.SendPage(mod.id,page)end,body)end
+   line(M.UpdateStatus(mod),body,24)
    for _,update in ipairs(M.updates or {})do if update.id==mod.id then
-    line('Update available: '..update.version,body,24)
     action('Update to '..update.version,function()M.Install(update.source or mod.repository,mod.id)end,body)
    end end
-   if mod.id~='BladesongModFramework'then action((mod.enabled==false and 'Enable'or 'Disable')..' on next launch',function()M.Job('toggle',{id=mod.id,enabled=mod.enabled==false})end,body)end
+   if mod.id~='BladesongModFramework'then
+    action((mod.enabled==false and 'Enable'or 'Disable')..' on next launch',function()M.Job('toggle',{id=mod.id,enabled=mod.enabled==false})end,body)
+    action('Uninstall',function()M.quit_after_job=true;M.Job('uninstall',{id=mod.id})end,body)
+    line('Uninstall restarts Bladesong. Mod files and library data are kept in BMF_Uninstalled.',body,21)
+   end
   end
   for _,mod in ipairs(community)do render_mod(mod)end
   if #utilities>0 then

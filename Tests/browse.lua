@@ -3,7 +3,7 @@ local M,F,text,obj=assert(loadfile(root..'/Tests/manager_open.lua'))()
 local jobs,settings={},{}
 function F.GetSettings()return {registry_url=''}end
 function F.SetSetting(_,key,value)assert(type(value)=='string');settings[key]=value end
-function F.StartJob(operation,args,callback)jobs[#jobs+1]={operation=operation,args=args,callback=callback}end
+function F.StartJob(operation,args,callback,progress)jobs[#jobs+1]={operation=operation,args=args,callback=callback,progress=progress}end
 function text:Conv_TextToString(value)return {ToString=function()return value end}end
 M.Open();assert(table.concat(M.tabs._labels,',')=='Installed,Browse,Settings,Developer')
 M.PrimeCatalogue();assert(#M.browser>0 and #jobs==0,'Catalogue waited for network')
@@ -25,7 +25,10 @@ M.url:SetText('https://github.com/LTR-JT/PreconstructionLibrary');action('Instal
 assert(jobs[#jobs].operation=='install'and type(jobs[#jobs].args.url)=='string')
 jobs[#jobs].callback({status='failed',error='Offline'})
 M.page='installed';M.Render();action('Check for updates').callback();local count=#jobs;M.CheckUpdates();assert(#jobs==count)
-jobs[#jobs].callback({status='complete',updates={{id='Example',name='Example mod',version='1.1.0',source='https://example.org/update.json'}}})
+assert(M.UpdateStatus({id='Example'})=='Checking...')
+jobs[#jobs].progress({checks={Example={state='current'}},updates={}})
+assert(M.update_checking and M.UpdateStatus({id='Example'})=='✓ Up to date')
+jobs[#jobs].callback({status='complete',updates={{id='Example',name='Example mod',version='1.1.0',source='https://example.org/update.json'}},checks={Example={state='update',version='1.1.0'}}})
 action('Update to 1.1.0').callback();assert(M.page=='installed'and jobs[#jobs].operation=='install')
 local quit=0;local find=StaticFindObject
 StaticFindObject=function(path)

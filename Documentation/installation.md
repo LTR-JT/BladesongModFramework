@@ -1,7 +1,7 @@
 # Install the Mod Manager
 
 1. Close Bladesong.
-2. Download **BladesongModFramework_0.1.6_Easy_Install_With_UE4SS.zip** from [Releases](https://github.com/LTR-JT/BladesongModFramework/releases/latest).
+2. Download **BladesongModFramework_0.1.7_Easy_Install_With_UE4SS.zip** from [Releases](https://github.com/LTR-JT/BladesongModFramework/releases/latest).
 3. Right-click the ZIP and choose **Extract All**.
 4. Open the extracted folder and double-click **INSTALL.cmd**.
 5. Press **Enter** to install, then start the game.

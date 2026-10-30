@@ -64,6 +64,48 @@ class Installer(unittest.TestCase):
   pending.write_text(json.dumps({'schema_version':1,'approved':True,'id':'preflight_fixture','relaunch':False,'items':[{'manifest':str(manifest),'payload':validated['payload']}]}))
   result=self.job('restart',{});self.assertEqual(result['status'],'failed');self.assertIn('Unmanaged installation',result['error'])
   self.assertEqual(target.read_text(),'personal edit');self.assertEqual(list(data.glob('apply-*.exe')),[])
+ def wait_for(self,predicate):
+  import time
+  deadline=time.monotonic()+10
+  while time.monotonic()<deadline:
+   if predicate():return
+   time.sleep(.05)
+  self.fail('Background apply did not finish')
+ def test_completed_plan_does_not_break_next_change(self):
+  archive,manifest=self.archive();validated=self.validate(archive,manifest)
+  pending=self.scripts.parent/'Data/pending.json';pending.parent.mkdir(exist_ok=True)
+  pending.write_text(json.dumps({'schema_version':1,'approved':False,'items':[]}))
+  mod=self.scripts.parent.parent/'FixtureMod';mod.mkdir();(mod/'enabled.txt').write_text('')
+  result=self.job('toggle',{'id':'FixtureMod','enabled':False});self.assertEqual(result['status'],'complete')
+  plan=json.loads(pending.read_text());self.assertTrue(plan['id'])
+  plan['relaunch']=False;pending.write_text(json.dumps(plan));self.assertEqual(self.job('apply',{'plan':str(pending)})['status'],'complete')
+  # An already-approved legacy plan without ID must also be repaired before restart.
+  pending.write_text(json.dumps({'schema_version':1,'approved':True,'relaunch':False,'items':[{'manifest':str(manifest),'payload':validated['payload']}]}))
+  self.assertEqual(self.job('restart',{})['status'],'waiting_for_exit')
+  record=mod/'bmf-installed.json';self.wait_for(record.exists);self.assertEqual(json.loads(record.read_text())['version'],'1.0.0')
+ def test_uninstall_archives_all_data_and_removes_active_mod(self):
+  mod=self.scripts.parent.parent/'FixtureMod';(mod/'Scripts/preconstructions').mkdir(parents=True)
+  (mod/'Scripts/main.lua').write_text('code');(mod/'Scripts/preconstructions/library.index').write_text('my library');(mod/'enabled.txt').write_text('')
+  mods=self.scripts.parent.parent/'mods.txt';mods.write_text('FixtureMod : 1\nOtherMod : 0\n')
+  result=self.job('uninstall',{'id':'FixtureMod'});self.assertEqual(result['status'],'waiting_for_exit',result)
+  complete=self.scripts.parent/'Data/last-apply.json';self.wait_for(complete.exists)
+  self.assertEqual(json.loads(complete.read_text())['status'],'complete');self.assertFalse(mod.exists())
+  archives=[p for p in (self.scripts.parents[3]/'BMF_Uninstalled').glob('*')if p.is_dir()];self.assertEqual(len(archives),1)
+  self.assertEqual((archives[0]/'Scripts/preconstructions/library.index').read_text(),'my library')
+  self.assertIn('OtherMod : 0',mods.read_text());self.assertNotIn('FixtureMod : 1',mods.read_text())
+ def test_uninstall_dependency_and_framework_guards(self):
+  mods=self.scripts.parent.parent;target=mods/'FixtureMod';target.mkdir();(target/'enabled.txt').write_text('')
+  dependent=mods/'Dependent';dependent.mkdir();(dependent/'enabled.txt').write_text('')
+  (dependent/'mod.json').write_text(json.dumps({'schema_version':1,'id':'Dependent','name':'Dependent','version':'1.0.0','api':'^1.0.0','dependencies':{'FixtureMod':'^1.0.0'}}))
+  result=self.job('uninstall',{'id':'FixtureMod'});self.assertEqual(result['status'],'failed');self.assertIn('depends',result['error']);self.assertTrue(target.exists())
+  self.assertEqual(self.job('uninstall',{'id':'BladesongModFramework'})['status'],'failed')
+ def test_failed_uninstall_restores_original_folder(self):
+  mod=self.scripts.parent.parent/'FixtureMod';mod.mkdir();(mod/'personal.json').write_text('keep me')
+  # A conflicting directory must never be deleted, and the archived mod must return.
+  (self.scripts.parent.parent/'mods.txt').mkdir()
+  self.assertEqual(self.job('uninstall',{'id':'FixtureMod'})['status'],'waiting_for_exit')
+  complete=self.scripts.parent/'Data/last-apply.json';self.wait_for(complete.exists)
+  self.assertEqual(json.loads(complete.read_text())['status'],'failed');self.assertEqual((mod/'personal.json').read_text(),'keep me')
  def test_failure_rolls_back_prior_write(self):
   p,m=self.archive();manifest=json.loads(m.read_text());data=b'second';manifest['files'].append({'path':'blocked/second.lua','size':len(data),'sha256':hashlib.sha256(data).hexdigest()})
   m.write_text(json.dumps(manifest))
@@ -110,6 +152,11 @@ class Installer(unittest.TestCase):
   started=time.perf_counter();result=self.job('browse',{'index_url':url});elapsed=time.perf_counter()-started
   self.assertEqual(result['status'],'complete',result);self.assertTrue(result['cached_index']);self.assertFalse('Using cached index' in result['message']);self.assertEqual(result['entries'][0]['manifest']['id'],'Cached')
   print('Cached catalogue worker: %.0f ms (no network)'%(elapsed*1000))
+ def test_update_check_reports_unavailable_and_pinned_per_mod(self):
+  mods=self.scripts.parent.parent
+  for name,extra in [('NoFeed',{}),('Pinned',{'repository':'https://github.com/example/pinned','pinned_version':'1.0.0'})]:
+   folder=mods/name;folder.mkdir();metadata={'schema_version':1,'id':name,'name':name,'version':'1.0.0','api':'^1.0.0'};metadata.update(extra);(folder/'mod.json').write_text(json.dumps(metadata))
+  result=self.job('updates',{});self.assertEqual(result['status'],'complete');self.assertEqual(result['checks']['NoFeed']['state'],'unavailable');self.assertEqual(result['checks']['Pinned']['state'],'pinned')
  def test_automatic_manifest_and_ordinary_discovery(self):
   mods=self.scripts.parent.parent
   for name in ['Ordinary','Declared','Broken']:(mods/name/'Scripts').mkdir(parents=True);(mods/name/'Scripts/main.lua').write_text('')

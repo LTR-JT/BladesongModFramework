@@ -2,7 +2,7 @@
 local root,F=...
 local J=F._json
 local C={jobs={},sequence=0}
-function C.StartJob(operation,args,callback)
+function C.StartJob(operation,args,callback,progress)
  C.sequence=C.sequence+1
  local id='job_'..os.time()..'_'..math.floor(os.clock()*1000000)..'_'..C.sequence
  local base=root..'../../BladesongModFramework/'
@@ -13,7 +13,7 @@ function C.StartJob(operation,args,callback)
  local bytes=base..'Scripts/bmf-worker.exe'..'\0'..path
  local arguments={#bytes};for i=1,#bytes do arguments[#arguments+1]=bytes:byte(i)end
  assert(C.launch(table.unpack(arguments))>0,'Could not launch the background worker')
- C.jobs[id]={path=path,callback=callback,started=os.time()}
+ C.jobs[id]={path=path,callback=callback,progress=progress,started=os.time()}
  if not C.polling and type(ExecuteInGameThreadWithDelay)=='function'then
   C.polling=true
   local function poll()
@@ -30,9 +30,19 @@ function C.Poll()
   local response
   if file then local wire=file:read('*a');file:close();local ok,value=pcall(J.decode,wire);response=ok and value or {status='failed',error='Invalid worker result'}
   elseif os.time()-job.started>180 then response={status='failed',error='Worker timed out. Staged files have not been applied.'}end
+  if not response and job.progress then
+   local progress=io.open(job.path..'.progress.json','rb')
+   if progress then
+    local wire=progress:read('*a');progress:close()
+    if wire~=job.progress_seen then
+     job.progress_seen=wire;local decoded,value=pcall(J.decode,wire)
+     if decoded then local ok,why=pcall(job.progress,value);if not ok then F.errors[#F.errors+1]=tostring(why);print('[BMF] Job progress callback failed: '..tostring(why)..'\n')end end
+    end
+   end
+  end
   if response then
    C.jobs[id]=nil
-   if job.callback then local ok,why=pcall(job.callback,response);if not ok then F.errors[#F.errors+1]=tostring(why)end end
+   if job.callback then local ok,why=pcall(job.callback,response);if not ok then F.errors[#F.errors+1]=tostring(why);print('[BMF] Job callback failed: '..tostring(why)..'\n')end end
   end
  end
 end
