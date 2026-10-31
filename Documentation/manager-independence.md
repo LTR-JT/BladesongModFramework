@@ -11,8 +11,8 @@ Remaining coupling: framework main.lua unconditionally created the manager, brow
 ## Current component boundaries
 
 - **BladesongModFramework 0.1.8 candidate**: stable API 1.0.0, build detection, compatibility translations, configuration, diagnostics, messaging, and shared game UI. Framework/ and RuntimeHelper/ contain no catalog, network, deployment or restart implementation.
-- **BladesongModManager 0.1.0 candidate**: The separate BladesongModManager repository contains the optional Mods page, catalog, installer, resolver, updates, uninstall, ownership and restart. It depends on the runtime. The runtime never imports the manager.
-- **Developer SDK 1.0.1 candidate**: the separate BladesongSDK repository contains schemas, developer documentation, examples and packaging/validation tools. No manager or runtime binary is required to develop a mod.
+- **BladesongModManager 0.1.1 candidate**: The separate BladesongModManager repository contains the optional Mods page, catalog, installer, resolver, updates, uninstall, ownership and restart. It is a standalone UE4SS mod and does not depend on the runtime. The runtime never imports the manager.
+- **Developer SDK 1.0.2 candidate**: the separate BladesongSDK repository contains schemas, developer documentation, examples and packaging/validation tools. No manager or runtime binary is required to develop a mod.
 - **PCL 15.18.2**: unchanged Lua/native behavior and saved-data format; only portable metadata is extended in its own repository. No manager dependency.
 
 The components now live in three repositories: LTR-JT/BladesongModFramework, LTR-JT/BladesongModManager, and LTR-JT/BladesongSDK. The original framework history and the manager repository initial commit are preserved. Extracted source records its upstream provenance. PCL remains in its fourth, existing repository.
@@ -51,3 +51,6 @@ These tests are not a new live-game certification. The split manager entry point
 The complete check runner passed: 20 real worker install/rollback/target fixtures, 6 dependency/ownership/component-release fixtures using local metadata, 4 disposable bootstrap installer fixtures, 1 exact-install identity fixture, and 1 hidden-launch fixture. The Lua suite also passed syntax, manager-free mocked lifecycle, API/compatibility, optional manager UI, Creative/provider ownership and performance, and frozen historical SDK preservation. PCL's own syntax and Parts/Blades Forge-mode checks passed with its runtime source unchanged. Package checks verified hashed payloads, the absence of manager code in the runtime archive, one framework in the bootstrap, the SDK without binaries, and disabled UE4SS debug consoles.
 
 Framework developer-mode configuration stays registered. Existing combined auto-check and registry preferences are copied into the optional manager's per-mod settings only when those settings are absent; original values are preserved. Pending install plans are not migrated or executed automatically.
+
+
+The manager independence requirement has been strengthened: the Creative base remains here, but the manager now uses its own private services, local generic tabs and a stock game frame. Neither component requires the other. The manager bootstrap contains UE4SS and the manager only; a framework is installed as a dependency of selected SDK mods. The earlier split-manager runtime prerequisite is superseded.
