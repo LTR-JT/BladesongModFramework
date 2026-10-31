@@ -29,7 +29,7 @@ function C.Poll()
   local file=io.open(job.path..'.result.json','rb')
   local response
   if file then local wire=file:read('*a');file:close();local ok,value=pcall(J.decode,wire);response=ok and value or {status='failed',error='Invalid worker result'}
-  elseif os.time()-job.started>180 then response={status='failed',error='Worker timed out. Staged files have not been applied.'}end
+  elseif os.time()-job.started>180 then response={status='failed',error='Runtime service timed out.'}end
   if not response and job.progress then
    local progress=io.open(job.path..'.progress.json','rb')
    if progress then

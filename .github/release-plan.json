@@ -1,5 +1,4 @@
 {
-  "publish": true,
-  "version": "0.1.7"
+  "publish": false,
+  "version": "0.1.8"
 }
-

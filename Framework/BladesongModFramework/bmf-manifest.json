@@ -3,12 +3,30 @@
   "id": "BladesongModFramework",
   "name": "Bladesong Mod Framework",
   "author": "LTR-JT and contributors",
-  "description": "Experimental in-game runtime and SDK foundation",
-  "version": "0.1.7",
+  "description": "Manager-independent compatibility runtime and shared game UI services",
+  "version": "0.1.8",
   "api": "^1.0.0",
   "capabilities": [],
   "dependencies": {},
   "files": [],
   "repository": "https://github.com/LTR-JT/BladesongModFramework",
-  "license": "MIT"
+  "license": "MIT",
+  "release_source": {
+    "type": "github",
+    "repository": "https://github.com/LTR-JT/BladesongModFramework",
+    "tag_prefix": "v"
+  },
+  "runtime_components": {
+    "UE4SS": "*"
+  },
+  "package": {
+    "format": "bladesong-mod-1",
+    "target": "ue4ss-mods"
+  },
+  "settings": {
+    "developer_mode": {
+      "type": "boolean",
+      "default": false
+    }
+  }
 }

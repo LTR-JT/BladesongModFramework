@@ -1,26 +1,29 @@
-# Install the Mod Manager
+# Installation
+
+These instructions describe the **unpublished split-component candidate**. Existing public 0.1.7 packages still combine the manager with the runtime.
+
+## Optional in-game manager: easiest bootstrap
 
 1. Close Bladesong.
-2. Download **BladesongModFramework_0.1.7_Easy_Install_With_UE4SS.zip** from [Releases](https://github.com/LTR-JT/BladesongModFramework/releases/latest).
-3. Right-click the ZIP and choose **Extract All**.
-4. Open the extracted folder and double-click **INSTALL.cmd**.
-5. Press **Enter** to install, then start the game.
+2. Extract `BladesongModManager_0.1.0_Easy_Install_With_UE4SS.zip` completely.
+3. Open the extracted folder and run `INSTALL.cmd`.
+4. Select the Steam Bladesong folder if asked.
+5. Start Bladesong and click Mods above Options.
 
-Click **Mods**, just above **Options**, on the main menu.
-UE4SS is included. You do not need to install it separately.
+This one-time package includes configured UE4SS, one framework installation and the separate manager mod. Debug windows are disabled. It is an installer, not a player-facing launcher. Existing saves and libraries are preserved; replaced files are backed up in BMF_Backups. Bootstrap transfers maintenance of these two components to the in-game manager through their deployment records.
 
-If the installer asks for the game folder, open Steam, right-click Bladesong,
-then choose **Manage > Browse local files**. Select that folder in the installer.
+If UE4SS is already installed, the smaller Bootstrap ZIP contains just the runtime and manager. Copy its Bladesong folder into the Steam game folder, then enable BladesongModFramework and BladesongModManager in `Bladesong/Binaries/Win64/ue4ss/Mods/mods.txt`. Put the framework first. The package contains separate folders, never a framework copy inside each mod.
 
-Browse loads the community mod list automatically. Install checks the package and restarts Bladesong to apply it. Your saves, PCL library and other mods are not deleted. Replaced
-files are backed up in **BMF_Backups** inside the game folder.
+## Runtime without the manager
 
-## Copy files manually instead
+Install compatible UE4SS, then copy the framework Runtime ZIP's Bladesong folder into the Steam game folder. Enable BladesongModFramework in UE4SS. Install PCL or another SDK mod and enable it after the framework. Do not install BladesongModManager. PCL's Forge button, hotkeys and Creative provider remain framework services and work without a manager.
 
-Copy the extracted **Bladesong** folder into the game folder opened by Steam.
-Choose **Replace** when asked. Keep existing saves and the Mods folder.
+Runtime.zip is a manual deployment overlay. Package.zip is the portable hashed archive for compatible managers. GitHub Source code is for development. A third-party manager should resolve the runtime dependency and use its own deployment ownership; no Vortex extension is currently supplied.
 
-The small Runtime ZIP is for people who already have compatible UE4SS.
-The BMF ZIP is for the in-game updater. GitHub's Source code ZIP is for developers.
+## Updating an existing combined installation
 
-Use **Browse** to install a catalogue mod or a repository URL. Available updates appear beside their mods on **Installed** after the automatic startup check.
+Back up saves, framework Data and PCL libraries first. The new runtime replaces the combined main.lua and offline helper; the manager is installed into its own folder. Old unused manager files and old pending jobs under framework Data are preserved and never automatically executed by the new runtime. Finish old approved transactions with the old manager before migrating. Do not transplant pending job files into the new manager. Manual ownership adoption requires a matching receipt and explicit confirmation. Older combined receipts did not track the shared LogicMods assets; use the verified bootstrap redeployment for that transition rather than silently claiming those files in an in-game update.
+
+This source candidate has automated validation but still needs in-game testing before a release is approved.
+
+Bootstrap packages and installation source are maintained at https://github.com/LTR-JT/BladesongModManager. Runtime-only packages remain in BladesongModFramework. SDK tools are maintained separately at https://github.com/LTR-JT/BladesongSDK.

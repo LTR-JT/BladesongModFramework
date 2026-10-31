@@ -1,11 +1,7 @@
-Bladesong Mod Framework 0.1.7
+Unpublished split-component candidate
 
-Download **BladesongModFramework_0.1.7_Easy_Install_With_UE4SS.zip** for a new installation. Close Bladesong, Extract All, open the folder and double-click INSTALL.cmd. UE4SS is included and its debug windows are disabled.
+Runtime 0.1.8: manager-independent offline compatibility and shared Creative UI. API 1.0.0 unchanged.
+Manager 0.1.0: separately installable optional manager, recursive dependency plans with confirmation, ownership checks and verified manual adoption.
+SDK 1.0.1: portable schemas, validators, templates, package mappings and manager integration documentation.
 
-- Fixed one-click installation after a previous completed transaction. New and legacy pending plans receive valid transaction IDs before the game exits.
-- Shorter backup paths avoid Windows path-length failures during updates.
-- The helper records the installation result and relaunches Bladesong after applying changes, including an ordinary failed apply. Failed changes are reported on the next launch.
-- Check for updates shows Checking on each installed mod, then Up to date, Update, or a clear failure/unavailable status. Checks run concurrently in the background.
-- Installed mod cards include Uninstall. The game exits normally, the mod is removed from the load order, and its complete folder is kept under Bladesong/Binaries/Win64/BMF_Uninstalled. Libraries and other mod data are preserved. Enabled dependents must be removed or disabled first.
-
-PCL 15.18.2 remains compatible. All changes retain the existing Creative menu, catalogue cache and background refresh improvements.
+PCL runtime source and saved-data format are unchanged. Candidate tests are recorded in Documentation/manager-independence.md. In-game verification is pending. Publishing is disabled until explicitly authorized.

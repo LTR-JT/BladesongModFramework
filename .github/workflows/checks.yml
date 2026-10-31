@@ -5,26 +5,35 @@ permissions:
 jobs:
   windows:
     runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: BladesongModFramework
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: BladesongModFramework
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Build pinned Lua 5.4
-        run: python Tools/build_ci_lua.py
-      - name: Run checks
-        run: python Tools/run_checks.py --lua Tests/ci-lua/lua.exe
-      - name: Build native components
+      - name: Read reviewed build dependencies
+        id: deps
+        shell: pwsh
         run: |
-          python Tools/build_native.py --build 25940006
-          python Tools/build_native.py --build 25431485
-      - name: Run native behavior fixtures
-        run: python Tools/run_native_tests.py
-      - name: Prepare install packages
-        run: |
-          python Tools/package_release.py
-          python Tools/build_easy_install.py
+          $buildDependencies = Get-Content BuildDependencies.json -Raw | ConvertFrom-Json
+          'sdk_ref=' + $buildDependencies.sdk.ref >> $env:GITHUB_OUTPUT
+      - uses: actions/checkout@v4
+        with:
+          repository: LTR-JT/BladesongSDK
+          ref: ${{ steps.deps.outputs.sdk_ref }}
+          path: BladesongSDK
+      - run: python Tools/build_ci_lua.py
+      - run: python Tools/run_checks.py --lua Tests/ci-lua/lua.exe
+      - run: python Tools/build_native.py --build 25940006
+      - run: python Tools/build_native.py --build 25431485
+      - run: python Tools/run_native_tests.py
+      - run: python Tools/package_release.py
+      - run: python Tools/check_packages.py
       - uses: actions/upload-artifact@v4
         with:
-          name: BladesongModFramework-preview
-          path: Releases/
+          name: BladesongModFramework-candidate
+          path: BladesongModFramework/Releases/

@@ -1,12 +1,7 @@
-# Releasing
+# Independent releases
 
-Run the local checks and builds, test on the supported game branches, and update
-the root/runtime mod.json version together. Commit the change and create the
-matching `vVERSION` tag. Run **Draft release** from Actions with that tag.
-The workflow checks the tag's version, builds the code and produces a draft
-prerelease containing Runtime/BMF ZIPs, mod.json and SHA256SUMS.txt.
+Runtime, optional manager, SDK and PCL each have their own repository, version and v-tags. This repository publishes only framework Runtime/Package archives and mod.json. Building or pushing source does not authorize a release.
 
-Review the draft assets and release notes before publishing. Do not use the
-manual Runtime archive as the in-game installer archive; the release manifest
-points to the BMF archive. Cooked asset changes require a manual Runtime update
-because the in-game updater intentionally cannot write arbitrary game paths.
+Run this repository's checks, native fixtures and package checks first. The SDK build-tool revision is recorded in BuildDependencies.json. After explicit release authorization, dispatch publish.yml with a matching v-tag; draft is the default. No push-triggered release workflow remains. The legacy release plan is publish=false.
+
+Manager bootstrap assembly and configured UE4SS packaging live in LTR-JT/BladesongModManager. Developer SDK releases live in LTR-JT/BladesongSDK. Neither needs its version bumped for an ordinary compatible framework update. Preserve the API 1 contract snapshots and frozen consumer fixtures.

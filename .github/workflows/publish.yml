@@ -1,47 +1,58 @@
-name: Publish release
+name: Publish repository component (manual only)
 on:
-  push:
-    paths: ['.github/release-plan.json']
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Matching v-tag for this repository
+        required: true
+        type: string
+      draft:
+        description: Keep as an unpublished draft
+        type: boolean
+        default: true
 permissions:
   contents: write
 jobs:
-  publish:
+  windows:
     runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: BladesongModFramework
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: BladesongModFramework
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Read release plan
-        id: plan
+      - name: Read reviewed build dependencies
+        id: deps
         shell: pwsh
         run: |
-          $plan = Get-Content .github/release-plan.json | ConvertFrom-Json
-          'publish=' + $plan.publish.ToString().ToLower() >> $env:GITHUB_OUTPUT
-      - if: steps.plan.outputs.publish == 'true'
-        run: python Tools/build_ci_lua.py
-      - if: steps.plan.outputs.publish == 'true'
-        run: python Tools/run_checks.py --lua Tests/ci-lua/lua.exe
-      - if: steps.plan.outputs.publish == 'true'
-        run: python Tools/build_native.py --build 25940006
-      - if: steps.plan.outputs.publish == 'true'
-        run: python Tools/build_native.py --build 25431485
-      - if: steps.plan.outputs.publish == 'true'
-        run: python Tools/run_native_tests.py
-      - if: steps.plan.outputs.publish == 'true'
-        run: python Tools/package_release.py
-      - if: steps.plan.outputs.publish == 'true'
-        run: python Tools/build_easy_install.py
-      - name: Publish checked packages
-        if: steps.plan.outputs.publish == 'true'
+          $buildDependencies = Get-Content BuildDependencies.json -Raw | ConvertFrom-Json
+          'sdk_ref=' + $buildDependencies.sdk.ref >> $env:GITHUB_OUTPUT
+      - uses: actions/checkout@v4
+        with:
+          repository: LTR-JT/BladesongSDK
+          ref: ${{ steps.deps.outputs.sdk_ref }}
+          path: BladesongSDK
+      - run: python Tools/build_ci_lua.py
+      - run: python Tools/run_checks.py --lua Tests/ci-lua/lua.exe
+      - run: python Tools/build_native.py --build 25940006
+      - run: python Tools/build_native.py --build 25431485
+      - run: python Tools/run_native_tests.py
+      - run: python Tools/package_release.py
+      - run: python Tools/check_packages.py
+      - name: Publish only this repository's checked artifacts
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_DRAFT: ${{ inputs.draft }}
         shell: pwsh
         run: |
-          $meta = Get-Content mod.json | ConvertFrom-Json
-          $tag = 'v' + $meta.version
-          $assets = @(Get-ChildItem Releases/*.zip | ForEach-Object FullName)
-          $assets += @((Resolve-Path Releases/mod.json).Path, (Resolve-Path Releases/SHA256SUMS.txt).Path)
-          gh release create $tag @assets --target $env:GITHUB_SHA --title ($meta.name + ' ' + $tag) --notes-file RELEASE_NOTES.md
+          $assets = @(python Tools/release_component.py $env:RELEASE_TAG)
+          if ($LASTEXITCODE -ne 0) { throw 'Version/tag mismatch' }
+          $options = @('--target', $env:GITHUB_SHA, '--notes-file', 'RELEASE_NOTES.md')
+          if ($env:RELEASE_DRAFT -eq 'true') { $options += '--draft' }
+          gh release create $env:RELEASE_TAG @assets @options
           if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }
