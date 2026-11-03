@@ -1,5 +1,5 @@
 {
   "publish": true,
   "version": "0.1.12",
-  "reason": "Publish Main build 26400894 compatibility and Creative UI fixes"
+  "reason": "Publish Main build 26400894 compatibility and Creative UI fixes using pinned Lua source for CI"
 }
