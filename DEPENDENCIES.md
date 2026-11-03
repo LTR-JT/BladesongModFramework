@@ -5,7 +5,7 @@
 | Component | Use | Distribution status |
 | --- | --- | --- |
 | UE4SS | Player runtime, reflection, hooks, SDK dump tooling | Separately installed dependency; exact upstream redistribution terms require release review |
-| Windows .NET Framework | Headless worker and standard JSON/ZIP/HTTP APIs | Uses OS runtime; no downloaded runtime bundled |
+| Windows system APIs | Local SHA-256, save enumeration, and settings persistence | Uses operating system libraries |
 | Lua 5.4 executable | Developer fixture runner | Local tooling; CI downloads a pinned checksum-verified source archive and builds it |
 | Python | Developer build/tests/docs | Not required by players |
 | PCL source/helpers/menu assets | Existing project migration and native UI | Preserve provenance and ownership; do not assume their authorization covers stock game assets |

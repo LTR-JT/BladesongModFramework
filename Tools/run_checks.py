@@ -16,7 +16,7 @@ with __import__('tempfile').TemporaryDirectory(dir=ROOT/'Tests')as temp:
  run(lua,syntax)
 for fixture in ['runtime_independence.lua','core.lua','compatibility.lua','creative_ownership.lua','creative_performance.lua','preservation.lua']:run(lua,ROOT/'Tests'/fixture)
 if os.name=='nt':
- run(sys.executable,ROOT/'Tools/build_worker.py')
- for fixture in ['identity_test.py','hidden_worker_test.py']:run(sys.executable,ROOT/'Tests'/fixture)
-else:print('Windows worker fixtures not run on this host')
+ run(sys.executable,ROOT/'Tools/build_local_service.py')
+ for fixture in ['local_service_test.py']:run(sys.executable,ROOT/'Tests'/fixture)
+else:print('Windows local service fixtures not run on this host')
 print('All framework preservation checks passed')

@@ -1,6 +1,6 @@
 # Bladesong Mod Framework
 
-Manager-independent compatibility runtime and shared game UI for Bladesong. This repository provides runtime 0.1.9 on stable API 1.0.0. It contains no in-game manager, downloader or installer.
+Manager-independent compatibility runtime and shared game UI for Bladesong. This repository provides runtime 0.1.11 on stable API 1.0.0. It contains no in-game manager, downloader or installer.
 
 The separate [BladesongModManager](https://github.com/LTR-JT/BladesongModManager) supplies optional installation and update management. The separate [BladesongSDK](https://github.com/LTR-JT/BladesongSDK) supplies schemas, templates, documentation and packaging tools. [PreconstructionLibrary](https://github.com/LTR-JT/PreconstructionLibrary) depends only on this runtime.
 
@@ -15,6 +15,7 @@ python Tools/run_checks.py --lua C:/path/to/lua.exe
 python Tools/build_native.py --build 25940006
 python Tools/build_native.py --build 25431485
 python Tools/run_native_tests.py
+python Tools/build_local_service.py
 python Tools/package_release.py
 python Tools/check_packages.py
 ```

@@ -8,5 +8,5 @@ do not grant rights to game or engine assets.
 UE4SS is a separately installed runtime and is not bundled by these source
 repositories. Lua is downloaded from upstream by developer-only CI with a pinned
 checksum; its copyright and license remain in that source distribution.
-The worker uses the installed Windows .NET Framework. No game executable,
+The local service uses Windows system APIs. No game executable,
 extracted game asset or raw SDK/header dump is distributed here.

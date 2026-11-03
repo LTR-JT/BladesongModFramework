@@ -10,11 +10,11 @@ def environment():
  env={k.upper():v for k,v in os.environ.items()};env.update((k.upper(),v)for k,v in (line.split('=',1)for line in wire.splitlines()if '='in line and not line.startswith('=')))
  return env
 
-def build(source,destination,workspace):
+def build(source,destination,workspace,compiler_flags=()):
  env=environment();workspace=Path(workspace).resolve();workspace.mkdir(parents=True,exist_ok=True)
  source=Path(source).resolve();destination=Path(destination).resolve();destination.parent.mkdir(parents=True,exist_ok=True)
  obj=workspace/(source.stem+'.obj')
  compiler=shutil.which('cl.exe',path=env['PATH']);linker=shutil.which('link.exe',path=env['PATH'])
  assert compiler and linker,'MSVC compiler/linker missing from the developer environment'
- subprocess.run([compiler,'/nologo','/c','/O2','/GS-','/GR-','/Zl',f'/Fo:{obj}',str(source)],env=env,cwd=workspace,check=True)
- subprocess.run([linker,'/nologo','/DLL','/NOENTRY','/NODEFAULTLIB',str(obj),'kernel32.lib','user32.lib','vcruntime.lib',f'/OUT:{destination}',f'/IMPLIB:{workspace/source.stem}.lib'],env=env,cwd=workspace,check=True)
+ subprocess.run([compiler,'/nologo','/c','/O2','/MT','/GS','/GR-','/Brepro',*compiler_flags,f'/Fo:{obj}',str(source)],env=env,cwd=workspace,check=True)
+ subprocess.run([linker,'/nologo','/DLL','/DYNAMICBASE','/NXCOMPAT','/HIGHENTROPYVA','/Brepro',str(obj),'kernel32.lib','user32.lib',f'/OUT:{destination}',f'/IMPLIB:{workspace/source.stem}.lib'],env=env,cwd=workspace,check=True)

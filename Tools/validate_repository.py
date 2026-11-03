@@ -29,8 +29,8 @@ print('PASS: minimal index, frozen source/data hashes, historical API signatures
 # Runtime distributions and startup must contain no management implementation.
 assert not any((ROOT/'Framework').rglob('manager.lua'))
 assert not any((ROOT/'Framework').rglob('catalogue.lua'))
-runtime=(ROOT/'RuntimeHelper/Runtime.cs').read_text(encoding='utf-8')
-assert not any(token in runtime for token in ['System.Net','Resolve(','StageArchive','Process.Start','deployment.json'])
+runtime=(ROOT/'NativeSource/common/local_service.cpp').read_text(encoding='utf-8')
+assert not any(token in runtime for token in ['WinHttp','WinInet','CreateProcess','ShellExecute','URLDownloadToFile'])
 print('PASS: manager-free runtime source and portable manifest validation')
 
 source=(ROOT/'Framework/shared/BladesongFramework/api.lua').read_text(encoding='utf-8')

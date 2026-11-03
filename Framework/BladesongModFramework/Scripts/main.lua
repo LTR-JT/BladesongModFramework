@@ -1,4 +1,4 @@
--- Bladesong Mod Framework 0.1.9. All UObject access stays on the game thread.
+-- Bladesong Mod Framework 0.1.11. All UObject access stays on the game thread.
 if BMF_RUNTIME_STARTED then return end
 BMF_RUNTIME_STARTED=true
 BMF_ROOT=debug.getinfo(1,'S').source:gsub('^@',''):match('^(.*[\\/])')..'../../shared/BladesongFramework/'
@@ -22,12 +22,22 @@ function BMF_RuntimeTick()
  local ok,err=pcall(function()
   BMF.Poll();BMF_WORKER.Poll();BMF_CREATIVE.Tick()
   local settings=BMF._get('settings')or '{}'
-  if settings~=BMF_SAVED_SETTINGS then
-   BMF_SAVED_SETTINGS=settings;BMF.StartJob('settings',{settings=BMF._json.decode(settings)},function(result)if result.status=='failed'then BMF.errors[#BMF.errors+1]=result.error end end)
+  if settings~=BMF_SAVED_SETTINGS and not BMF_SETTINGS_PENDING and os.time()>=(BMF_SETTINGS_RETRY or 0) then
+   local payload=BMF._json.decode(settings)
+   BMF_SETTINGS_PENDING=true
+   BMF.StartJob('settings',{settings=payload},function(result)
+    BMF_SETTINGS_PENDING=false
+    if result.status=='complete' then
+     BMF_SAVED_SETTINGS=settings
+    else
+     BMF_SETTINGS_RETRY=os.time()+10
+     BMF.errors[#BMF.errors+1]=result.error
+    end
+   end)
   end
  end)
  if not ok and tostring(err)~=BMF_LAST_ERROR then BMF_LAST_ERROR=tostring(err);BMF.errors[#BMF.errors+1]=BMF_LAST_ERROR;print('[BMF] '..BMF_LAST_ERROR..'\n')end
  ExecuteInGameThreadWithDelay(500,BMF_RuntimeTick)
 end
 ExecuteInGameThreadWithDelay(500,BMF_RuntimeTick)
-print('[BMF] Framework 0.1.9 initialized; API 1.0.0; branch identity is unknown until verified.\n')
+print('[BMF] Framework 0.1.11 initialized; API 1.0.0; branch identity is unknown until verified.\n')

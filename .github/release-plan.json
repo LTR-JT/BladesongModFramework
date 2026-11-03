@@ -1,5 +1,5 @@
 {
   "publish": true,
-  "version": "0.1.9",
-  "reason": "User explicitly approved publishing all current repository releases"
+  "version": "0.1.11",
+  "reason": "Publish the in-process Framework runtime"
 }
