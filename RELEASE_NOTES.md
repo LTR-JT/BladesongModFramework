@@ -1,7 +1,10 @@
-Unpublished split-component candidate
+Bladesong Mod Framework 0.1.9 candidate
 
-Runtime 0.1.8: manager-independent offline compatibility and shared Creative UI. API 1.0.0 unchanged.
-Manager 0.1.0: separately installable optional manager, recursive dependency plans with confirmation, ownership checks and verified manual adoption.
-SDK 1.0.1: portable schemas, validators, templates, package mappings and manager integration documentation.
+- Owns the shared Creative/Story library layout independently of PCL.
+- Uses stock game widget containers; PCL owns its anchor/UI asset pack.
+- Creative's Main menu button travels directly to the MainMenu map instead of opening the escape menu.
+- The Main menu button is closer to the library panel.
+- Existing SDK API 1.0.0 and saved-data formats are unchanged.
 
-PCL runtime source and saved-data format are unchanged. Candidate tests are recorded in Documentation/manager-independence.md. In-game verification is pending. Publishing is disabled until explicitly authorized.
+Requires compatible UE4SS. The framework does not include or require the Mod Manager.
+Use Runtime.zip for manual installation, or Package.zip with a compatible in-game installer.

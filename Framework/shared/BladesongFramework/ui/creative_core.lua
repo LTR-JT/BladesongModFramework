@@ -297,28 +297,13 @@ end
 
 function pcl151762_exit_to_main(state)
  assert(not state.busy and not state.confirm and not PCL151762_IMPORT,'Finish the current operation first')
- local player=state.home:GetOwningPlayer()
- local function finish()
-  if PCL151762_HOME~=state then return true end
-  for _,menu in pairs(FindAllOf('WBP_PauseMenu_C')or {})do
-   if is_valid(menu)and is_valid(menu.BtnMainMenu)and is_valid(menu:GetOwningPlayer())and menu:GetOwningPlayer():GetAddress()==player:GetAddress()then
-    local button=menu.BtnMainMenu
-    pcl151762_cleanup_home()
-    button:HandleButtonClicked() -- Use the game's own save/navigation flow.
-    return true
-   end
-  end
-  return false
- end
- if finish()then return end
- for _,opener in pairs(FindAllOf('BP_MenuOpener_C')or {})do
-  if is_valid(opener)and not safe_full_name(opener):find('Default__',1,true)then
-   opener:TogglePauseMenu()
-   pcl15179_schedule(1,function()if not finish()then pcl151762_status(state,'Main menu control is unavailable. Use the pause menu to return.')end end)
-   return
-  end
- end
- error('Native menu controller is unavailable')
+ local player=state.home:GetOwningPlayer();assert(is_valid(player),'Creative player is unavailable')
+ -- Creative Home has no active Forge operation. Travel directly to the game's
+ -- MainMenu map rather than opening a pause widget and synthesizing its click.
+ local statics=gameplay_statics_15();assert(is_valid(statics),'Game navigation is unavailable')
+ local level=require('UEHelpers').FindOrAddFName('MainMenu')
+ pcl151762_cleanup_home()
+ statics:OpenLevel(player,level,true,'')
 end
 function pcl151762_dispatch(action)
     if not action.kind or action.kind:sub(1,5)~='home_'then return false end
@@ -1038,9 +1023,9 @@ function pcl151762_mount_home_footer(state,outer,inside,section)
     local reserve=pcl151723_new(state.home,'SizeBox');reserve:SetHeightOverride(208);pcl151723_vadd(outer,reserve,0,0)
     local exit_row=pcl151723_new(state.home,'HorizontalBox');reserve:SetContent(exit_row)
     pcl151723_hadd(exit_row,pcl151723_new(state.home,'Spacer'),true,0)
-    state.exit_button=pcl151762_outline_action(state,exit_row,'Close','home_exit',240)
+    state.exit_button=pcl151762_outline_action(state,exit_row,'Main menu','home_exit',240)
     local exit_box=state.action_visuals[state.exit_button:GetAddress()].container
-    exit_box.Slot:SetVerticalAlignment(3);exit_box.Slot:SetPadding({Left=0,Top=0,Right=0,Bottom=12})
+    exit_box.Slot:SetVerticalAlignment(1);exit_box.Slot:SetPadding({Left=0,Top=24,Right=0,Bottom=0})
     -- Draw and hit-test Forge last, above the frame/footer that it overlaps.
     local lip=state.forge_layer:AddChildToOverlay(box);lip:SetHorizontalAlignment(2);lip:SetVerticalAlignment(3);box:SetRenderTranslation({X=0,Y=-132})
     local native=state.home.ForgeButton;state.forge_opacity=native:GetRenderOpacity();state.forge_style=native:GetStyle():GetClass()

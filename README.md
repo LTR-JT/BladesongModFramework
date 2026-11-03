@@ -1,6 +1,6 @@
 # Bladesong Mod Framework
 
-Manager-independent compatibility runtime and shared game UI for Bladesong. This source candidate is runtime 0.1.8 on stable API 1.0.0. It contains no in-game manager, downloader or installer.
+Manager-independent compatibility runtime and shared game UI for Bladesong. This source candidate is runtime 0.1.9 on stable API 1.0.0. It contains no in-game manager, downloader or installer.
 
 The separate [BladesongModManager](https://github.com/LTR-JT/BladesongModManager) supplies optional installation and update management. The separate [BladesongSDK](https://github.com/LTR-JT/BladesongSDK) supplies schemas, templates, documentation and packaging tools. [PreconstructionLibrary](https://github.com/LTR-JT/PreconstructionLibrary) depends only on this runtime.
 

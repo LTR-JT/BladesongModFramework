@@ -9,5 +9,5 @@ with zipfile.ZipFile(OUT/f'{id}_{version}_Package.zip')as z:
  assert len(z.namelist())==len(m['files'])+1
  assert not any(name.endswith(('manager.lua','catalogue.lua','bmm-worker.exe'))for name in z.namelist())
  assert b'System.Net'not in z.read('Scripts/bmf-worker.exe')
- assert any(name.startswith('assets/logicmods/')for name in z.namelist())
-print('PASS: framework-only package, portable hashes, offline helper, and shared runtime assets')
+ assert not any(name.startswith('assets/')or 'PCLAnchor'in name for name in z.namelist())
+print('PASS: framework-only package, portable hashes, offline helper, and no PCL-owned assets')

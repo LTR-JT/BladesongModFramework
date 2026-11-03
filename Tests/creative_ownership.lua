@@ -29,3 +29,22 @@ print('PASS: framework owns Creative/Story UI without PCL; enabled provider adds
 
 -- Framework-only screens have no provider tab: opacity updates must tolerate it.
 host.environment.pcl151762_action_opacity({action_visuals={}},nil,.4)
+
+-- The framework-only UI uses a stock container, never a PCL asset.
+local previous_find,previous_all,previous_construct=StaticFindObject,FindAllOf,StaticConstructObject
+local class={GetAddress=function()return 101 end}
+local frame={GetClass=function()return class end}
+FindAllOf=function(name)assert(name=='WBP_MainMenu_C');return {{WBP_OptionsMenu={ScreenModeApplyFrame=frame}}}end
+local root_widget={SetVisibility=function()end}
+StaticConstructObject=function()return root_widget end
+StaticFindObject=function(path)
+ assert(not path:find('/Game/PCL/',1,true),'Framework-only Creative UI requests PCL assets')
+ if path:find('WidgetBlueprintLibrary',1,true)then return {Create=function()return {WidgetTree={},GetAddress=function()return 102 end,SetVisibility=function()end,SetIsEnabled=function()end}end}end
+ return {}
+end
+assert(host.environment.pcl15171_load_widget_assets())
+local container=host.environment.pcl15171_create_widget({GetOwningPlayer=function()end},class)
+assert(host.environment.pcl15171_widget_by_name(container,'PCL_EntryRoot')==root_widget)
+assert(container.WidgetTree.RootWidget==root_widget)
+StaticFindObject,FindAllOf,StaticConstructObject=previous_find,previous_all,previous_construct
+print('PASS: framework-only Creative uses stock widget root without cooked PCL assets')

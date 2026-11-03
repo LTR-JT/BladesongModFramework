@@ -32,17 +32,31 @@ if not options.provider then
  E.PCL151761_PARTS_DIR=root..'../../BladesongModFramework/Data/CreativeBackups/'
  E.pcl151112_script_dir=function()return root..'../../BladesongModFramework/Scripts/'end
  E.pcl15171_widget_library=function()return StaticFindObject('/Script/UMG.Default__WidgetBlueprintLibrary')end
- E.pcl15171_create_widget=function(context,class)return E.pcl15171_widget_library():Create(context,class,context:GetOwningPlayer())end
+ local entry_roots={}
+ E.pcl15171_create_widget=function(context,class)
+  local widget=E.pcl15171_widget_library():Create(context,class,context:GetOwningPlayer())
+  if valid(widget)and valid(E.PCL15171_ENTRY_CLASS_OBJ)and class:GetAddress()==E.PCL15171_ENTRY_CLASS_OBJ:GetAddress()then
+   local root=StaticConstructObject(StaticFindObject('/Script/UMG.SizeBox'),widget.WidgetTree)
+   widget.WidgetTree.RootWidget=root;root:SetVisibility(4);widget:SetVisibility(4);widget:SetIsEnabled(true)
+   entry_roots[widget:GetAddress()]=root
+  end
+  return widget
+ end
  E.pcl15174_load_object=function(path)
   local object=StaticFindObject(path);if valid(object)then return object end
   local package,name=path:match('^(.*)%.([^%.]+)$');local helpers=require('UEHelpers')
   return StaticFindObject('/Script/AssetRegistry.Default__AssetRegistryHelpers'):GetAsset({PackageName=helpers.FindOrAddFName(package),AssetName=helpers.FindOrAddFName(name)})
  end
  E.pcl15171_load_widget_assets=function()
-  E.PCL15171_ENTRY_CLASS_OBJ=E.pcl15174_load_object('/Game/PCL/UI/WBP_PCL_LibraryEntry.WBP_PCL_LibraryEntry_C')
-  return valid(E.PCL15171_ENTRY_CLASS_OBJ)
+  for _,menu in pairs(FindAllOf('WBP_MainMenu_C')or {})do
+   if valid(menu.WBP_OptionsMenu)and valid(menu.WBP_OptionsMenu.ScreenModeApplyFrame)then
+    E.PCL15171_ENTRY_CLASS_OBJ=menu.WBP_OptionsMenu.ScreenModeApplyFrame:GetClass();return valid(E.PCL15171_ENTRY_CLASS_OBJ)
+   end
+  end
+  return false
  end
  E.pcl15171_widget_by_name=function(owner,name)
+  if valid(owner)and name=='PCL_EntryRoot'and entry_roots[owner:GetAddress()]then return entry_roots[owner:GetAddress()]end
   local seen={}
   local function visit(widget)
    if not valid(widget)or seen[widget:GetAddress()]then return end;seen[widget:GetAddress()]=true

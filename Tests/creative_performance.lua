@@ -54,14 +54,16 @@ files['parts/library.index']='two\n';assert(#C.entries('parts','parts/','parts/l
 io.open=old_open
 print('PASS: repeated bind hooks are idempotent; selection, rename and delete invalidate the relevant caches')
 
--- Close uses the native menu command and ignores stale pause widgets from another player.
-local player=object();local other=object();home.GetOwningPlayer=function()return player end
-local clicked,cleaned=0,0
-local main_button={HandleButtonClicked=function()clicked=clicked+1 end}
-local wrong={GetOwningPlayer=function()return other end,BtnMainMenu=main_button}
-local menu={GetOwningPlayer=function()return player end,BtnMainMenu=main_button}
+-- Main menu travels directly; a pause-menu click or delayed widget must not be required.
+local player=object();home.GetOwningPlayer=function()return player end
+local travelled,cleaned=0,0
 E.PCL151762_HOME=state;state.busy=false;state.confirm=nil;E.PCL151762_IMPORT=nil
 E.pcl151762_cleanup_home=function()cleaned=cleaned+1;E.PCL151762_HOME=nil end
-E.FindAllOf=function(kind)if kind=='WBP_PauseMenu_C'then return {wrong,menu}end;return {}end
-E.pcl151762_exit_to_main(state);assert(clicked==1 and cleaned==1)
-print('PASS: Creative Close restores the framework UI and invokes the current player native Main Menu button')
+E.FindAllOf=function()error('Main menu navigation must not open or search the pause menu')end
+E.require=function(name)assert(name=='UEHelpers');return {FindOrAddFName=function(value)assert(value=='MainMenu');return value end}end
+E.gameplay_statics_15=function()return {OpenLevel=function(_,context,level,absolute,options)
+ assert(context==player and level=='MainMenu'and absolute==true and options=='');assert(cleaned==1);travelled=travelled+1
+end}end
+E.pcl151762_exit_to_main(state);assert(travelled==1 and cleaned==1)
+state.busy=true;assert(not pcall(E.pcl151762_exit_to_main,state));assert(travelled==1 and cleaned==1)
+print('PASS: Creative Main menu cleans up its UI and travels directly, without opening the escape menu; busy operations block travel')
