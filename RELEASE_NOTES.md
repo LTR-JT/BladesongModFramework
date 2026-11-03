@@ -1,4 +1,4 @@
-Bladesong Mod Framework 0.1.9 candidate
+Bladesong Mod Framework 0.1.9
 
 - Owns the shared Creative/Story library layout independently of PCL.
 - Uses stock game widget containers; PCL owns its anchor/UI asset pack.

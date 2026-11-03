@@ -1,6 +1,6 @@
 # Bladesong Mod Framework
 
-Manager-independent compatibility runtime and shared game UI for Bladesong. This source candidate is runtime 0.1.9 on stable API 1.0.0. It contains no in-game manager, downloader or installer.
+Manager-independent compatibility runtime and shared game UI for Bladesong. This repository provides runtime 0.1.9 on stable API 1.0.0. It contains no in-game manager, downloader or installer.
 
 The separate [BladesongModManager](https://github.com/LTR-JT/BladesongModManager) supplies optional installation and update management. The separate [BladesongSDK](https://github.com/LTR-JT/BladesongSDK) supplies schemas, templates, documentation and packaging tools. [PreconstructionLibrary](https://github.com/LTR-JT/PreconstructionLibrary) depends only on this runtime.
 
@@ -21,4 +21,4 @@ python Tools/check_packages.py
 
 Contracts/ contains the runtime's API snapshots and Tests/frozen contains preserved consumers. SDK owns the portable schemas and developer tools. Shared Creative/Story/PCL-provider UI stays here.
 
-The current source split is not a new released or live-game-certified build. Release workflows require explicit manual dispatch; source pushes do not publish releases. Exact-build native gates remain in place. Original code and assets are MIT licensed; see LICENSE and THIRD_PARTY_NOTICES.md.
+Releases require manual dispatch or an explicitly approved, version-matched .github/release-plan.json change. Ordinary source pushes do not publish releases. Automated checks do not replace in-game verification. Exact-build native gates remain in place. Original code and assets are MIT licensed; see LICENSE and THIRD_PARTY_NOTICES.md.
