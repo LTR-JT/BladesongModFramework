@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "id": "main-26400894-anchor-test",
+  "branch": "main",
+  "buildid": "26400894",
+  "sha256": "0928484ccb4accf4a4bf7fa51e438a70ba92b08556d502631cfb3f8c9fa86985",
+  "status": "Main 26400894: anchor support and tested cached Parts prefab pickup. Blade and upload native adapters are unavailable on this build.",
+  "overrides": {},
+  "legacy_pcl_native_verified": false,
+  "native_helpers": {
+    "pcl_anchor_catalogue_patch_15170.dll": {
+      "verified": true,
+      "path": "native/26400894/pcl_anchor_catalogue_patch_15170.dll",
+      "validation": "Reflected layout and offline fixture; live test pending"
+    },
+    "pcl_anchor_socket_151741.dll": {
+      "verified": true,
+      "path": "native/26400894/pcl_anchor_socket_151741.dll",
+      "validation": "Reflected layout and offline fixture; live test pending"
+    },
+    "pcl_anchor_reload_151756.dll": {
+      "verified": true,
+      "path": "native/26400894/pcl_anchor_reload_151756.dll",
+      "validation": "New header offsets and offline fixture; live test pending"
+    },
+    "pcl_download_capture_151762.dll": {
+      "path": "native/26400894/pcl_download_capture_151762.dll",
+      "validation": "Exact executable hash, traced call targets and offline capture fixture. Live placement pending.",
+      "verified": true
+    },
+    "pcl_local_cache_151733.dll": {
+      "verified": true,
+      "path": "native/26400894/pcl_local_cache_151733.dll",
+      "validation": "Exact executable hash, save and restore call targets and reflected layout; live round-trip pending."
+    }
+  }
+}

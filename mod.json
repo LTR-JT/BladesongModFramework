@@ -4,7 +4,7 @@
   "name": "Bladesong Mod Framework",
   "author": "LTR-JT and contributors",
   "description": "Manager-independent compatibility runtime and shared game UI services",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "api": "^1.0.0",
   "capabilities": [],
   "dependencies": {},

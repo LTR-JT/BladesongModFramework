@@ -219,19 +219,69 @@ function pcl151762_start_import(state,raw)
     end
     pcl15179_schedule(100,poll)
 end
+-- Hide the stock layout during construction until the mod has mounted.
+-- Restore the original opacity on failure or if the widget never enters view.
+function pcl151762_release_home_mask(home)
+    local mask=PCL151762_HOME_MASK
+    if not mask or (home and mask.address~=home:GetAddress()) then return end
+    PCL151762_HOME_MASK=nil
+    if is_valid(mask.home) then mask.home:SetRenderOpacity(mask.opacity) end
+end
+
+function pcl151762_install_home_construct_hook()
+    if PCL151762_HOME_CONSTRUCT_HOOK then return end
+    local path='/Game/UI/CreativeMode/WBP_CreativeModeHome.WBP_CreativeModeHome_C:Construct'
+    if not is_valid(StaticFindObject(path)) then return end
+    local ok=pcall(function()
+        RegisterHook(path,function(context)
+            local home=pcl15171_unwrap(context)
+            if not is_valid(home) or (PCL151762_HOME and PCL151762_HOME.home:GetAddress()==home:GetAddress()) then return end
+            pcl151762_release_home_mask()
+            local mask={home=home,address=home:GetAddress(),opacity=home:GetRenderOpacity()}
+            PCL151762_HOME_MASK=mask
+            home:SetRenderOpacity(0)
+            pcl15179_schedule(1,pcl151762_monitor_home)
+            pcl15179_schedule(250,function()
+                if PCL151762_HOME_MASK==mask then pcl151762_release_home_mask() end
+            end)
+        end)
+    end)
+    if ok then
+        PCL151762_HOME_CONSTRUCT_HOOK=true
+        log('PCL_CREATIVE_CONSTRUCT_HOOK installed=true')
+    end
+end
+
 function pcl151762_monitor_home()
+    pcl151762_install_home_construct_hook()
     pcl151762_start_save_backup()
     local state=PCL151762_HOME
     if state and not pcl151762_visible(state.home)then pcl151762_cleanup_home();state=nil end
     if state then pcall(pcl151762_align_toolbar,state);return end
     for _,home in pairs(FindAllOf('WBP_CreativeModeHome_C') or {})do
-        if pcl151762_visible(home) and is_valid(home.ForgeButton) and PCL151762_FAILED_HOME~=home:GetAddress()then
-            if not pcl15171_load_widget_assets(home)then return end
+        if pcl151762_visible(home) and is_valid(home.ForgeButton) and is_valid(home.DownloadButton) then
+            local address=home:GetAddress()
+            if PCL151762_FAILED_HOME==address and os.time()<(PCL151762_HOME_RETRY_AT or 0) then return end
+            if not pcl15171_load_widget_assets(home) then return end
             local ok,err=pcall(pcl151762_create_home,home)
-            if not ok then pcl151762_cleanup_home();PCL151762_FAILED_HOME=home:GetAddress();log('PCL15_17_62_HOME_UI_ERROR '..tostring(err))end
+            pcl151762_release_home_mask(home)
+            if ok then
+                PCL151762_FAILED_HOME=nil
+                PCL151762_HOME_RETRY_AT=nil
+            else
+                PCL151762_FAILED_HOME=address
+                PCL151762_HOME_RETRY_AT=os.time()+2
+                local cleaned,cleanup_error=pcall(pcl151762_cleanup_home)
+                if not cleaned then
+                    log('PCL15_17_62_HOME_CLEANUP_ERROR '..tostring(cleanup_error))
+                end
+                log('PCL15_17_62_HOME_UI_ERROR '..tostring(err))
+            end
             return
         end
     end
+    PCL151762_FAILED_HOME=nil
+    PCL151762_HOME_RETRY_AT=nil
 end
 function pcl151762_library_delete(state)
     assert(state.library_selecting and state.open and state.view~='delete'and not state.busy,'Library selection changed')
@@ -640,10 +690,18 @@ function pcl151762_create_home(home)
 end
 function pcl151762_cleanup_home()
     local state=PCL151762_HOME;if not state then return end
+    PCL151762_HOME=nil
+    for _,key in ipairs({'forge_viewport','toolbar','tools','delete_toolbar'}) do
+        local widget=state[key]
+        if is_valid(widget) then
+            pcall(function() widget:SetVisibility(1);widget:RemoveFromParent() end)
+        end
+    end
     local request=PCL151762_IMPORT
-    if request and request.state==state then request.bridge.cancel();PCL151762_IMPORT=nil end
+    if request and request.state==state then PCL151762_IMPORT=nil;pcall(request.bridge.cancel) end
     state.open=false;pcall(pcl151762_native_view,state,true);pcall(pcl151762_input,state,nil)
-    pcl151762_restore_home_layout(state)
+    local restored,err=pcall(pcl151762_restore_home_layout,state)
+    if not restored then log('PCL15_17_62_HOME_RESTORE_ERROR '..tostring(err)) end
     pcl151762_forget_buttons(state.buttons);pcl151762_forget_buttons(state.row_buttons)
     if is_valid(state.toolbar)then state.toolbar:RemoveFromParent()end
     if is_valid(state.section_heading)then state.section_heading:SetVisibility(state.section_heading_visibility or 0)end
@@ -665,7 +723,7 @@ function pcl151762_cleanup_home()
     if is_valid(state.tools)then state.tools:RemoveFromParent()end
     if is_valid(state.delete_toolbar)then state.delete_toolbar:RemoveFromParent()end
     if is_valid(state.heading)then state.heading:SetRenderOpacity(state.heading_opacity or 1);state.heading:SetVisibility(state.heading_visibility or 0)end
-    PCL151723_UI[state.home:GetAddress()]=nil;PCL151762_HOME=nil
+    if is_valid(state.home) then PCL151723_UI[state.home:GetAddress()]=nil end
 end
 function pcl151762_native_changed(context)
     local state=PCL151762_HOME;if not state or not state.open or state.patching then return end

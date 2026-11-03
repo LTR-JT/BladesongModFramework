@@ -62,6 +62,7 @@ jobs:
       - run: python Tools/run_checks.py --lua Tests/ci-lua/lua.exe
       - run: python Tools/build_native.py --build 25940006
       - run: python Tools/build_native.py --build 25431485
+      - run: python Tools/build_native.py --build 26400894
       - run: python Tools/run_native_tests.py
       - run: python Tools/package_release.py
       - run: python Tools/check_packages.py

@@ -1,5 +1,5 @@
 {
   "publish": true,
-  "version": "0.1.11",
-  "reason": "Publish the in-process Framework runtime"
+  "version": "0.1.12",
+  "reason": "Publish Main build 26400894 compatibility and Creative UI fixes"
 }

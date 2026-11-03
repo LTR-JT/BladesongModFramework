@@ -1,5 +1,5 @@
-Bladesong Mod Framework 0.1.11 candidate
+## Bladesong Mod Framework 0.1.12
 
-The Framework now identifies the game build, saves settings, and enumerates save files through an in-process Windows DLL. File operations run off the game thread, and native compatibility selection still requires the executable's SHA-256 fingerprint.
-
-The runtime package drops bmf-worker.exe and bmf-launch.dll. The Mod Manager is distributed separately.
+- Adds exact-build compatibility for Bladesong Main Steam build 26400894, including anchors, prefab download and offline prefab cache.
+- Restores the Creative Library UI on return from the Forge and hides it sooner when entering.
+- The new Main profile currently supports the Parts placement workflow. Native blade operations and upload are pending a separate port.
