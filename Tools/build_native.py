@@ -3,7 +3,7 @@ import argparse
 from pathlib import Path
 from msvc import build
 ROOT=Path(__file__).resolve().parents[1]
-p=argparse.ArgumentParser();p.add_argument('--build',choices=['25431485','25940006','26400894'],default='25940006');args=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('--build',choices=['25431485','25940006','26400894','26433453'],default='25940006');args=p.parse_args()
 sources=ROOT/'NativeSource'/args.build;target=ROOT/'Framework/shared/BladesongFramework/native'/args.build
 for source in sorted(sources.glob('*.cpp')):
  name=source.stem+('b'if source.stem=='pcl_held_upload_151725'else '')+'.dll'

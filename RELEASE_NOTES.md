@@ -1,5 +1,5 @@
-## Bladesong Mod Framework 0.1.12
+## Bladesong Mod Framework 0.1.13
 
-- Adds exact-build compatibility for Bladesong Main Steam build 26400894, including anchors, prefab download and offline prefab cache.
-- Restores the Creative Library UI on return from the Forge and hides it sooner when entering.
-- The new Main profile currently supports the Parts placement workflow. Native blade operations and upload are pending a separate port.
+- Adds an exact-build profile for Bladesong Main hotfix 0.3.7770 (Steam build 26433453), with anchor, prefab download and offline prefab cache adapters.
+- Two in-game tests loaded a cached Parts prefab and handed it to the player.
+- On this game build, native blade operations, upload and automatic Creative save backups remain unavailable.
