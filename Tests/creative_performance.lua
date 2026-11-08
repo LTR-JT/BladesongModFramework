@@ -91,6 +91,32 @@ for _,kind in ipairs({'Overlay','ContentWidget'})do
 end
 print('PASS: full-card selection target layers above and restores the native card')
 
+local piece=object();piece.WeaponDesignDefinition={AppliedSwordParts={1,2},BladeSwordParts={1}}
+local card=object();card.NameText={text='Sword'}
+local label=object()
+function label:SetText(text)self.text=text end
+function label:SetVisibility(value)self.visibility=value end
+E.pcl151762_mount_part_label=function(_,title)
+ assert(title==card.NameText)
+ return {label=label}
+end
+local counts={open=false}
+E.pcl151762_card_part_count(counts,card,piece)
+E.pcl151762_card_part_count(counts,card,piece)
+assert(card.NameText.text=='Sword' and label.text=='2 parts' and label.visibility==3)
+counts.open=true;counts.view='all';counts.piece_entries={[piece:GetAddress()]={mode='parts',code='saved'}}
+counts.part_counts={parts={}}
+E.pcl151762_card_part_count(counts,card,piece)
+assert(label.visibility==1,'An uncached library entry borrowed the stock part count')
+counts.part_counts.parts.saved=1
+E.pcl151762_card_part_count(counts,card,piece)
+assert(label.text=='1 part' and label.visibility==3)
+card.NameText.text='Renamed'
+counts.part_counts.parts.saved=0
+E.pcl151762_card_part_count(counts,card,piece)
+assert(card.NameText.text=='Renamed' and label.text=='0 parts')
+print('PASS: card captions use attached part counts, preserve renames and omit unknown counts')
+
 -- Main menu travels directly; a pause-menu click or delayed widget must not be required.
 local player=object();home.GetOwningPlayer=function()return player end
 local travelled,cleaned=0,0

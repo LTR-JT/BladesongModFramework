@@ -58,16 +58,59 @@ function pcl151762_forget_buttons(buttons)
         if PCL15176_BUTTONS then PCL15176_BUTTONS[id]=nil end
     end
 end
-function pcl151762_preview_from_cache(code,panel)
-    local statics=gameplay_statics_15()
-    local saveclass=StaticFindObject('/Script/Bladesong.CreativeModeSave');local piececlass=StaticFindObject('/Script/Bladesong.Piece')
-    assert(is_valid(saveclass) and is_valid(piececlass),'Preview data classes unavailable')
-    local save=statics:LoadGameFromSlot(pcl151726_slot(code),0)
-    if not is_valid(save) or save:GetClass():GetAddress()~=saveclass:GetAddress()then return end
+function pcl151762_load_cached_build(code)
+    local saveclass=StaticFindObject('/Script/Bladesong.CreativeModeSave')
+    if not is_valid(saveclass) or not pcl151726_has_cache(code)then return end
+    local save=gameplay_statics_15():LoadGameFromSlot(pcl151726_slot(code),0)
+    if is_valid(save) and save:GetClass():GetAddress()==saveclass:GetAddress() and #save.Pieces==1 then return save,saveclass end
+end
+function pcl151762_preview_from_cache(code,panel,save,saveclass)
+    if not save then save,saveclass=pcl151762_load_cached_build(code)end
+    if not save then return end
+    local piececlass=StaticFindObject('/Script/Bladesong.Piece')
+    assert(is_valid(piececlass),'Preview data class unavailable')
     local piece=StaticConstructObject(piececlass,panel);pcl151731_fresh(piece);assert(is_valid(piece),'Preview data allocation failed')
     assert(pcl151726_bridge().restore(save:GetAddress(),piece:GetAddress(),saveclass:GetAddress(),piececlass:GetAddress())==1,'Preview data restore refused')
     local texture=piece:GetPreviewImage()
     if is_valid(texture)then PCL151724_PREVIEWS[code]={owner=panel,piece=piece,texture=texture}end
+end
+function pcl151762_card_part_count(state,view,piece)
+    if not is_valid(view) or not is_valid(piece) or state.story_open then return end
+    local count
+    if state.open and state.view~='delete'then
+        local entry=state.piece_entries and state.piece_entries[piece:GetAddress()]
+        local counts=entry and state.part_counts and state.part_counts[entry.mode]
+        count=counts and counts[entry.code]
+    else
+        local design=piece.WeaponDesignDefinition
+        if design and design.AppliedSwordParts then count=#design.AppliedSwordParts end
+    end
+    local title=view.NameText
+    if not is_valid(title)then return end
+    state.part_labels=state.part_labels or {}
+    local id=view:GetAddress()
+    local entry=state.part_labels[id]
+    if count~=nil and not entry then
+        local ok,result=pcall(pcl151762_mount_part_label,view,title)
+        if ok then entry=result;state.part_labels[id]=entry
+        else log('BMF_CARD_PART_LABEL_UNAVAILABLE '..tostring(result));state.part_labels[id]=false end
+    end
+    if entry and is_valid(entry.label) and entry.count~=count then
+        entry.count=count
+        if count~=nil then
+            entry.label:SetText(pcl15171_to_text(tostring(count)..(count==1 and ' part' or ' parts')))
+        end
+        entry.label:SetVisibility(count==nil and 1 or 3)
+    end
+end
+function pcl151762_refresh_part_counts(state)
+    if state.story_open then return end
+    local control=state.home.PieceItemsCollection
+    if not is_valid(control) or not is_valid(control.ItemPanel)then return end
+    for index=0,control.ItemPanel:GetChildrenCount()-1 do
+        local view=control:GetChildAt(index)
+        if is_valid(view)then pcl151762_card_part_count(state,view,view.BoundPiece)end
+    end
 end
 function pcl151762_selected_count(state)
     local n=0;for _ in pairs(state.selected or {})do n=n+1 end;return n
@@ -451,6 +494,34 @@ function pcl151762_restore_swap(swap)
     if is_valid(swap.replacement)then swap.replacement:RemoveFromParent()end
     if is_valid(swap.original) and is_valid(swap.spec.parent)then pcl151762_attach_slot(swap.original,swap.spec)end
 end
+-- Replace a widget without moving the title behind the card's footer.
+function pcl151762_replace_ordered(original,replacement)
+    local spec=pcl151762_slot_spec(original)
+    local tail={}
+    if spec.kind=='vertical' or spec.kind=='horizontal' or spec.kind=='overlay'then
+        for index=spec.parent:GetChildIndex(original)+1,spec.parent:GetChildrenCount()-1 do
+            local widget=spec.parent:GetChildAt(index)
+            tail[#tail+1]={widget=widget,spec=pcl151762_slot_spec(widget)}
+        end
+    end
+    replacement:RemoveFromParent()
+    original:RemoveFromParent()
+    for _,entry in ipairs(tail)do entry.widget:RemoveFromParent()end
+    pcl151762_attach_slot(replacement,spec)
+    for _,entry in ipairs(tail)do pcl151762_attach_slot(entry.widget,entry.spec)end
+end
+function pcl151762_mount_part_label(view,title)
+    local stack=pcl151723_new(view,'VerticalBox')
+    local label=pcl151723_new(view,'TextBlock')
+    local style=title.bOverrideDefaultStyle and title.DefaultTextStyleOverride or title.DefaultTextStyle
+    label:SetFont(style.Font);label:SetColorAndOpacity(style.ColorAndOpacity)
+    label:SetJustification(1);label:SetRenderOpacity(.82);label:SetVisibility(1)
+    pcl151762_replace_ordered(title,stack)
+    local title_slot=stack:AddChildToVerticalBox(title);title_slot:SetHorizontalAlignment(0)
+    local count_slot=stack:AddChildToVerticalBox(label);count_slot:SetHorizontalAlignment(0)
+    count_slot:SetPadding({Left=0,Top=4,Right=0,Bottom=0})
+    return {stack=stack,title=title,label=label}
+end
 function pcl151762_context(state)
     assert(state and PCL151762_HOME==state and pcl151762_visible(state.home),'Creative screen changed')
     local utils=StaticFindObject('/Script/Bladesong.Default__BladesongUtils');assert(is_valid(utils),'Game utilities unavailable')
@@ -615,6 +686,7 @@ function pcl151762_native_view(state,show)
         if state.story_open then state.story_open=false;state.home.PieceItemsCollection.ItemTemplate=state.creative_template end
         pcl151762_restore_cards(state)
         if is_valid(state.original_collection)then state.home.PieceItemsCollection:Bind(state.original_collection)end
+        pcl151762_refresh_part_counts(state)
         pcl151762_restore_swap(state.import_swap);state.import_swap=nil
         if state.download_interaction~=nil then state.home.DownloadButton:SetIsInteractionEnabled(state.download_interaction);state.home.DownloadButton:SetIsFocusable(state.download_focusable)end
         if is_valid(state.import_submit)then state.import_submit:RemoveFromParent();state.import_submit:SetVisibility(1)end
@@ -677,7 +749,7 @@ function pcl151762_render(state)
         local bound,why=pcall(function()control:Bind(state.library_collection)end)
         state.patching=false;assert(bound,why)
     end
-    pcl151762_patch_cards(state);pcl151762_controls(state)
+    pcl151762_patch_cards(state);pcl151762_controls(state);pcl151762_refresh_part_counts(state)
     pcl15179_schedule(1,function()if PCL151762_HOME==state then pcl151762_refresh_native_images(state)end end)
 end
 function pcl151762_open(state,mode)
@@ -729,6 +801,7 @@ function pcl151762_create_home(home)
     state.heading_opacity=state.heading:GetRenderOpacity();state.heading_visibility=state.heading:GetVisibility();state.heading:SetVisibility(2)
     toolbar:AddToViewport(91);toolbar:SetDesiredSizeInViewport({X=1200,Y=84});toolbar:SetPositionInViewport({X=0,Y=0},false);toolbar:SetAnchorsInViewport({Minimum={X=.10,Y=.035},Maximum={X=.10,Y=.035}});toolbar:SetAlignmentInViewport({X=0,Y=0})
     pcl151762_controls(state);pcl151762_mount_folder_tabs(state);pcall(pcl151762_align_toolbar,state)
+    pcl151762_refresh_part_counts(state)
     if BMF_CREATIVE_HAS_PROVIDER then
      pcl15179_schedule(1,function()
       if PCL151762_HOME~=state then return end
@@ -742,6 +815,12 @@ end
 function pcl151762_cleanup_home()
     local state=PCL151762_HOME;if not state then return end
     PCL151762_HOME=nil
+    for _,entry in pairs(state.part_labels or {})do
+        if entry and is_valid(entry.stack) and is_valid(entry.title)then
+            pcall(pcl151762_replace_ordered,entry.stack,entry.title)
+        end
+    end
+    state.part_labels=nil
     for _,key in ipairs({'forge_viewport','toolbar','tools','delete_toolbar'}) do
         local widget=state[key]
         if is_valid(widget) then
@@ -777,9 +856,12 @@ function pcl151762_cleanup_home()
     if is_valid(state.home) then PCL151723_UI[state.home:GetAddress()]=nil end
 end
 function pcl151762_native_changed(context)
-    local state=PCL151762_HOME;if not state or not state.open or state.patching then return end
+    local state=PCL151762_HOME;if not state or state.patching then return end
     local control=pcl15171_unwrap(context)
-    if is_valid(control)and control:GetAddress()==state.home.PieceItemsCollection:GetAddress()then pcl151762_patch_cards(state)end
+    if is_valid(control)and control:GetAddress()==state.home.PieceItemsCollection:GetAddress()then
+        if state.open then pcl151762_patch_cards(state)end
+        pcl151762_refresh_part_counts(state)
+    end
 end
 function pcl151762_install_native_grid_hooks()
 for _,path in ipairs({'/Script/Bladesong.ItemsControl:OnBound','/Script/Bladesong.UWPieceInventory:SetFilter'})do
@@ -995,10 +1077,13 @@ function pcl151762_display_entries(state)
 end
 function pcl151762_queue_previews(state,entries)
  state.preview_cache=state.preview_cache or {};state.preview_queued=state.preview_queued or {};state.preview_jobs=state.preview_jobs or {}
+ state.part_counts=state.part_counts or {parts={},blades={}}
  for _,entry in ipairs(entries)do
   local key=entry.mode..':'..entry.code
   local preview=state.preview_cache[entry.mode]and state.preview_cache[entry.mode][entry.code]
-  if (not preview or not is_valid(preview.texture))and not state.preview_queued[key]then state.preview_queued[key]=true;state.preview_jobs[#state.preview_jobs+1]=entry end
+  if (state.part_counts[entry.mode][entry.code]==nil or not preview or not is_valid(preview.texture))and not state.preview_queued[key]then
+   state.preview_queued[key]=true;state.preview_jobs[#state.preview_jobs+1]=entry
+  end
  end
  if state.preview_loading or #state.preview_jobs==0 then return end;state.preview_loading=true
  local function step()
@@ -1007,13 +1092,26 @@ function pcl151762_queue_previews(state,entries)
   if not entry then state.preview_loading=false;state.preview_queued={};return end
   local cache=state.preview_cache[entry.mode]or {};state.preview_cache[entry.mode]=cache
   local preview=cache[entry.code]
-  if not preview or not is_valid(preview.texture)then
+  local counts=state.part_counts[entry.mode]
+  local needs_preview=not preview or not is_valid(preview.texture)
+  if counts[entry.code]==nil or needs_preview then
    local names={'PCL151761_MODE','PCL15171_LIBRARY_DIR','PCL15171_LIBRARY_PATH','PCL151724_PREVIEWS'};local saved={}
    for _,name in ipairs(names)do saved[name]=_G[name]end
    PCL151761_MODE=entry.mode;PCL15171_LIBRARY_DIR=entry.mode=='blades'and PCL151761_BLADE_DIR or PCL151761_PARTS_DIR
    PCL15171_LIBRARY_PATH=entry.mode=='parts'and PCL151761_PARTS_PATH or PCL15171_LIBRARY_DIR..'library.index';PCL151724_PREVIEWS=cache
    local started=os.clock()
-   local ok,why=pcall(function()if not pcl151727_load_preview(entry.code,state.home)and pcl151726_has_cache(entry.code)then pcl151762_preview_from_cache(entry.code,state.home)end end)
+   local ok,why=pcall(function()
+    local missing_preview=needs_preview and not pcl151727_load_preview(entry.code,state.home)
+    if counts[entry.code]==nil or missing_preview then
+     local save,saveclass=pcl151762_load_cached_build(entry.code)
+     if save then
+      save.Pieces:ForEach(function(_,value)
+       counts[entry.code]=#value:get().WeaponDesignDefinition.AppliedSwordParts
+      end)
+      if missing_preview then pcl151762_preview_from_cache(entry.code,state.home,save,saveclass)end
+     end
+    end
+   end)
    preview=cache[entry.code]
    for _,name in ipairs(names)do _G[name]=saved[name]end
    if not ok then log('BMF_PREVIEW_LOAD_FAILED '..tostring(why))end
@@ -1021,12 +1119,15 @@ function pcl151762_queue_previews(state,entries)
   end
   if preview and is_valid(preview.texture)then
    for address,record in pairs(state.piece_entries or {})do if record.code==entry.code and record.mode==entry.mode then state.piece_previews[address]=preview end end
-   for _,record in ipairs(state.native_cards or {})do
-    local item=state.piece_entries and state.piece_entries[record.piece:GetAddress()]
-    if item and item.code==entry.code and item.mode==entry.mode and is_valid(record.view.Image)then
+  end
+  for _,record in ipairs(state.native_cards or {})do
+   local item=state.piece_entries and state.piece_entries[record.piece:GetAddress()]
+   if item and item.code==entry.code and item.mode==entry.mode then
+    if preview and is_valid(preview.texture)and is_valid(record.view.Image)then
      record.view.Image:SetBrushFromTexture(preview.texture,true);record.view.Image:SetVisibility(0)
      pcl151751_image_tooltip(state.panel,record.view.Image,preview.texture)
     end
+    pcl151762_card_part_count(state,record.view,record.piece)
    end
   end
   pcl15179_schedule(16,step)

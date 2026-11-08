@@ -1,5 +1,5 @@
 {
   "publish": true,
-  "version": "0.1.14",
-  "reason": "Publish the Blade adapter, verified Creative backups and full-card multi-delete selection"
+  "version": "0.1.15",
+  "reason": "Publish build card part counts for Creative Library and Preconstruction Library"
 }
