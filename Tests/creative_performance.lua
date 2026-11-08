@@ -54,6 +54,43 @@ files['parts/library.index']='two\n';assert(#C.entries('parts','parts/','parts/l
 io.open=old_open
 print('PASS: repeated bind hooks are idempotent; selection, rename and delete invalidate the relevant caches')
 
+-- A full-card hit target leaves the native content in place and restores it
+-- when multi-delete exits. Cover both direct overlay and content wrappers.
+local function panel(kind)
+ local widget=object();widget.kind=kind;widget.children={}
+ function widget:AddChildToOverlay(child)
+  assert(not child.parent);self.children[#self.children+1]=child;child.parent=self
+  return {SetHorizontalAlignment=function(_,alignment)assert(alignment==0)end,
+          SetVerticalAlignment=function(_,alignment)assert(alignment==0)end}
+ end
+ function widget:SetContent(child)
+  assert(not self.children[1] and not child.parent)
+  self.children[1]=child;child.parent=self
+ end
+ function widget:GetContent()return self.children[1]end
+ function widget:GetParent()return self.parent end
+ function widget:RemoveFromParent()
+  local parent=self.parent
+  if not parent then return end
+  for i,child in ipairs(parent.children)do if child==self then table.remove(parent.children,i);break end end
+  self.parent=nil
+ end
+ return widget
+end
+E.pcl151762_class=function(widget,kind)return widget and widget.kind==kind end
+E.pcl151723_new=function(_,kind)return panel(kind)end
+for _,kind in ipairs({'Overlay','ContentWidget'})do
+ local card,content,hit=panel(kind),panel('visuals'),panel('hit')
+ if kind=='Overlay'then card:AddChildToOverlay(content)else card:SetContent(content)end
+ local record={view={WidgetTree={RootWidget=card}},selection_hit=hit}
+ E.pcl151762_mount_selection_hit(record,hit)
+ local overlay=kind=='Overlay'and card or card:GetContent()
+ assert(overlay.children[1]==content and overlay.children[2]==hit)
+ E.pcl151762_remove_selection_hit(record)
+ assert(card.children[1]==content and #card.children==1 and not hit.parent)
+end
+print('PASS: full-card selection target layers above and restores the native card')
+
 -- Main menu travels directly; a pause-menu click or delayed widget must not be required.
 local player=object();home.GetOwningPlayer=function()return player end
 local travelled,cleaned=0,0

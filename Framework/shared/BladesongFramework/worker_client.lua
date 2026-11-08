@@ -19,7 +19,8 @@ function C.StartJob(operation,args,callback)
    assert(written,why)
    assert(closed,closeError)
   end
-  local wire=operation..'\0'..id..'\0'..(operation=='list-saves' and args.source or '')
+  local saveJob=operation=='list-saves' or operation=='prepare-save-backup'
+  local wire=operation..'\0'..id..'\0'..(saveJob and args.source or '')
   assert(#wire<=16000,'Local service request is too long')
   local arguments={#wire}
   for i=1,#wire do arguments[#arguments+1]=wire:byte(i) end

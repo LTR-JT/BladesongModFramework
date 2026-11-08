@@ -70,6 +70,13 @@ static int cache_guard() {
        !same(image+0x45BB590,cache_load,sizeof(cache_load)))return -26;
     return 1;
 }
+static bool valid_cache_parts(u32 count) {
+#ifdef PCL_BLADE_CACHE
+    return count == 0;
+#else
+    return count >= 1 && count <= 6000;
+#endif
+}
 extern "C" __declspec(dllexport) int pcl_cache_probe(void* L) {return result(L,cache_guard());}
 extern "C" __declspec(dllexport) int pcl_cache_store(void* L) {
     u64 save=0,piece=0,saveclass=0,piececlass=0;
@@ -77,7 +84,7 @@ extern "C" __declspec(dllexport) int pcl_cache_store(void* L) {
     int status=cache_guard();if(status!=1)return result(L,status);
     if(busy||!live(save)||!live(piece)||!live(saveclass)||!live(piececlass))return result(L,-7);
     if(rd<u64>(save+0x10)!=saveclass||rd<u64>(piece+0x10)!=piececlass ||
-       rd<u64>(save+0x30)||rd<u64>(save+0x38)||rd<u32>(piece+0xD0)<1 || rd<u32>(piece+0xD0)>6000)return result(L,-27);
+       rd<u64>(save+0x30)||rd<u64>(save+0x38)||!valid_cache_parts(rd<u32>(piece+0xD0)))return result(L,-27);
     busy=true;
     __try {
         // Engine TArray grow: element size, alignment, allocator, capacity.
@@ -101,7 +108,7 @@ extern "C" __declspec(dllexport) int pcl_cache_restore(void* L) {
     if(rd<u64>(save+0x10)!=saveclass||rd<u64>(piece+0x10)!=piececlass||
        rd<u32>(save+0x38)!=1||!ptr(data)||rd<u32>(piece+0xD0)!=0)return result(L,-30);
     u32 count=rd<u32>(data+0xA0);
-    if(count<1||count>6000||!ptr(rd<u64>(data+0x98)))return result(L,-31);
+    if(!valid_cache_parts(count)||(count&&!ptr(rd<u64>(data+0x98))))return result(L,-31);
     busy=true;
     __try {
         u32 length=rd<u32>(data+0x180);

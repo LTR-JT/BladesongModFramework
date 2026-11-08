@@ -462,14 +462,45 @@ function pcl151762_context(state)
     assert(not is_valid(gs.RecentStoryModeSwordsInventory) or original:GetAddress()~=gs.RecentStoryModeSwordsInventory:GetAddress(),'Story inventory is excluded')
     return gs,original,gm,utils
 end
+function pcl151762_remove_selection_hit(record)
+    if is_valid(record.selection_hit)then record.selection_hit:RemoveFromParent()end
+    local swap=record.selection_overlay
+    if swap and is_valid(swap.original)then swap.original:RemoveFromParent()end
+    pcl151762_restore_swap(swap)
+    record.selection_hit=nil;record.selection_overlay=nil
+end
 function pcl151762_restore_cards(state)
     state.card_patch_key=nil
     for _,entry in ipairs(state.native_cards or {})do
+        pcall(pcl151762_remove_selection_hit,entry)
         pcall(pcl151762_restore_swap,entry.swap)
         pcall(function()if is_valid(entry.remove)then entry.remove:SetIsInteractionEnabled(entry.remove_interaction)end end)
         pcall(function()if is_valid(entry.button)then entry.button.bApplyAlphaOnDisable=entry.apply_alpha;entry.button:SetIsInteractionEnabled(entry.interaction);entry.button:SetIsFocusable(entry.focusable);entry.button:SetRenderOpacity(entry.opacity or 1)end end)
     end
     pcl151762_forget_buttons(state.row_buttons);state.row_buttons={};state.native_cards={};state.selection_buttons={}
+end
+function pcl151762_mount_selection_hit(record,hit)
+    local tree=record.view.WidgetTree
+    local root=tree and tree.RootWidget
+    if pcl151762_class(root,'CanvasPanel')then
+        local slot=root:AddChildToCanvas(hit)
+        slot:SetAnchors({Minimum={X=0,Y=0},Maximum={X=1,Y=1}})
+        slot:SetOffsets({Left=0,Top=0,Right=0,Bottom=0})
+        slot:SetZOrder(1000)
+    else
+        local overlay=root
+        if not pcl151762_class(root,'Overlay')then
+            assert(pcl151762_class(root,'ContentWidget'),'Unsupported Creative card root')
+            local content=root:GetContent()
+            assert(is_valid(content),'Creative card content unavailable')
+            overlay=pcl151723_new(record.view,'Overlay')
+            record.selection_overlay=pcl151762_swap_button(content,overlay)
+            local visual=overlay:AddChildToOverlay(content)
+            visual:SetHorizontalAlignment(0);visual:SetVerticalAlignment(0)
+        end
+        local slot=overlay:AddChildToOverlay(hit)
+        slot:SetHorizontalAlignment(0);slot:SetVerticalAlignment(0)
+    end
 end
 function pcl151762_patch_cards(state)
     if not state.open or state.patching then return end
@@ -515,7 +546,14 @@ function pcl151762_patch_cards(state)
             local replacement
             if state.view=='delete'or state.library_selecting then
                 if state.library_selecting then local entry=state.piece_entries[record.piece:GetAddress()];id=entry.mode..':'..entry.code end
-                replacement=pcl151762_button(state,nil,'[ ] Select','home_select',{id=id,piece=record.piece,library=state.library_selecting});state.selection_buttons[id]=replacement
+                local action={id=id,piece=record.piece,library=state.library_selecting}
+                replacement=pcl151762_button(state,nil,'[ ] Select','home_select',action)
+                local hit=pcl151762_button(state,nil,'','home_select',action)
+                record.selection_hit=hit
+                hit:SetStyle(pcl151762_transparent_style())
+                pcl151762_remove_native_chrome(hit)
+                hit:SetRenderOpacity(.001);hit:SetMinDimensions(0,0)
+                state.selection_buttons[id]={label=replacement,hit=hit}
             else
                 assert(code,'Unknown library card data for '..safe_full_name(record.piece))
                 state.view_codes=state.view_codes or {};state.view_codes[record.view:GetAddress()]=code
@@ -526,6 +564,16 @@ function pcl151762_patch_cards(state)
                 end
             end
             record.swap=pcl151762_swap_button(record.remove,replacement)
+            if is_valid(record.selection_hit)then
+                local mounted,why=pcall(pcl151762_mount_selection_hit,record,record.selection_hit)
+                if mounted then
+                    replacement:SetVisibility(3)
+                else
+                    pcl151762_remove_selection_hit(record)
+                    state.selection_buttons[id].hit=replacement
+                    log('BMF_CARD_SELECTION_HIT_UNAVAILABLE '..tostring(why))
+                end
+            end
         end
         state.rendering_rows=false;pcl151762_controls(state)
     end)
@@ -556,7 +604,10 @@ function pcl151762_controls(state)
     pcl151762_action_opacity(state,state.nav_delete,state.story_open and .40 or 1)
     pcl151762_update_folder_tabs(state)
     if is_valid(state.import_submit)then state.import_submit:SetIsEnabled(not locked and not PCL151762_IMPORT)end
-    for id,button in pairs(state.selection_buttons or {})do button:SetCaption(pcl15171_to_text(state.selected[id]and '[x] Selected'or '[ ] Select'));button:SetIsEnabled(not locked)end
+    for id,selection in pairs(state.selection_buttons or {})do
+        selection.label:SetCaption(pcl15171_to_text(state.selected[id]and '[x] Selected'or '[ ] Select'))
+        selection.hit:SetIsEnabled(not locked)
+    end
 end
 function pcl151762_native_view(state,show)
     if show then
@@ -1321,15 +1372,6 @@ function pcl151762_start_forge_hover(state)
 end
 -- Separate, versioned save snapshots; never modify the source saves.
 PCL151762_SAVE_BACKUP=nil
-function pcl151762_backup_mkdir(path)
-    PCL151762_BACKUP_DIRS=PCL151762_BACKUP_DIRS or {}
-    if PCL151762_BACKUP_DIRS[path]or path:match('^%a:/$')then return end
-    local parent=path:match('^(.*)/[^/]+$')
-    if parent and parent~=''and not parent:match('^%a:$')then pcl151762_backup_mkdir(parent)end
-    local args={#path};for i=1,#path do args[#args+1]=path:byte(i)end
-    assert(pcl151761_bridge().mkdir(table.unpack(args))==1,'Could not create save backup directory')
-    PCL151762_BACKUP_DIRS[path]=true
-end
 function pcl151762_start_save_backup()
     if PCL151762_SAVE_BACKUP then return end
     local request={status='starting',files={},index=1,bytes=0};PCL151762_SAVE_BACKUP=request
@@ -1338,7 +1380,7 @@ function pcl151762_start_save_backup()
         local saved=pcl151762_text(paths:ProjectSavedDir())
         saved=pcl151762_text(paths:ConvertRelativePathToFull(saved,'')):gsub('\\','/'):gsub('/$','')
         assert(saved~=''and not saved:find('["&|<>%%!%^\r\n]'),'Unsupported save directory')
-        request.source=saved..'/SaveGames';request.target=saved..'/BMF_SaveBackups/'..os.date('%Y%m%d_%H%M%S')..'_'..math.floor(os.clock()*1000)
+        request.source=saved..'/SaveGames'
         request.status='listing'
     end)
     local function fail(message)
@@ -1361,7 +1403,6 @@ function pcl151762_start_save_backup()
             end
             if not request.input then
                 local target=request.target..'/'..file.relative
-                pcl151762_backup_mkdir(target:match('^(.*)/[^/]+$'))
                 local existing=io.open(target,'rb');if existing then existing:close();error('Refusing to overwrite an existing backup')end
                 request.input=assert(io.open(file.source,'rb'));request.output=assert(io.open(target,'wb'));file.target=target;file.bytes=0
             end
@@ -1381,7 +1422,7 @@ function pcl151762_start_save_backup()
         if not success then fail(message);return end
         if request.status~='complete'then pcl15179_schedule(5,step)end
     end
-    BMF_CREATIVE_FRAMEWORK.StartJob('list-saves',{source=request.source},function(response)
+    BMF_CREATIVE_FRAMEWORK.StartJob('prepare-save-backup',{source=request.source},function(response)
         local success,why=pcall(function()
             assert(response.status=='complete',response.error or 'Could not enumerate saves')
             for _,entry in ipairs(response.files or {})do
@@ -1390,7 +1431,8 @@ function pcl151762_start_save_backup()
                 request.files[#request.files+1]={source=name,relative=name:sub(#request.source+2)}
             end
             assert(#request.files>0,'No existing save files found')
-            pcl151762_backup_mkdir(request.target);request.status='copying'
+            request.target=assert(response.target,'Save backup directory unavailable')
+            request.status='copying'
             pcl15179_schedule(1,step)
         end)
         if not success then fail(why)end

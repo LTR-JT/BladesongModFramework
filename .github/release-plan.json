@@ -1,5 +1,5 @@
 {
   "publish": true,
-  "version": "0.1.13",
-  "reason": "Publish compatibility for Bladesong Main hotfix 0.3.7770 (Steam build 26433453)"
+  "version": "0.1.14",
+  "reason": "Publish the Blade adapter, verified Creative backups and full-card multi-delete selection"
 }

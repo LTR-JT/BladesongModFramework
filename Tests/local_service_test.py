@@ -70,6 +70,13 @@ for _,entry in ipairs(result.files) do
  assert(entry.source:lower():match('%.sav$'))
 end
 assert(job('list-saves',{source=saveRoot..'/profile'}).status=='failed')
+local backup=job('prepare-save-backup',{source=saveRoot})
+assert(backup.status=='complete',backup.error)
+assert(#backup.files==2)
+assert(backup.target:match('/BMF_SaveBackups/job_[%w_]+$'))
+local output=assert(io.open(backup.target..'/profile/fixture.sav','wb'))
+assert(output:close())
+assert(job('prepare-save-backup',{source=saveRoot..'/profile'}).status=='failed')
 assert(job('install',{}).status=='failed')
 for _,value in ipairs({false,true}) do
  local result=job('settings',{settings={existing=value}})

@@ -1,5 +1,6 @@
-## Bladesong Mod Framework 0.1.13
+## Bladesong Mod Framework 0.1.14
 
-- Adds an exact-build profile for Bladesong Main hotfix 0.3.7770 (Steam build 26433453), with anchor, prefab download and offline prefab cache adapters.
-- Two in-game tests loaded a cached Parts prefab and handed it to the player.
-- On this game build, native blade operations, upload and automatic Creative save backups remain unavailable.
+- Adds the Blade import, local cache, and replacement adapter for Bladesong Main build 26433453.
+- Restores verified Creative save backups through the Framework file service.
+- Makes the full build card clickable in Creative and Preconstruction Library multi-delete mode.
+- Upload remains unavailable on Main build 26433453.

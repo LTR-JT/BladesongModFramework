@@ -117,11 +117,12 @@ std::string identify(const fs::path& root) {
     return result + '}';
 }
 
-std::string list_saves(const std::wstring& argument) {
+std::string list_saves(const std::wstring& argument, const std::wstring& backup_id = {}) {
     auto source = fs::absolute(argument).lexically_normal();
     require(source.filename() == L"SaveGames", "Expected SaveGames directory");
     reject_links(source);
     std::string result = "[";
+    std::vector<fs::path> save_directories;
     size_t count = 0, directories = 1;
     for (const auto& entry : fs::recursive_directory_iterator(source)) {
         DWORD flags = GetFileAttributesW(entry.path().c_str());
@@ -133,9 +134,22 @@ std::string list_saves(const std::wstring& argument) {
             require(count < 6000 && result.size() < 16 * 1024 * 1024, "Save file list limit");
             if (count++) result += ',';
             result += "{\"source\":" + quote(entry.path().generic_u8string()) + '}';
+            if (!backup_id.empty()) save_directories.push_back(entry.path().parent_path().lexically_relative(source));
         }
     }
-    return result + ']';
+    result += ']';
+    if (backup_id.empty()) return "{\"status\":\"complete\",\"files\":" + result + '}';
+    require(count > 0, "No existing save files found");
+    auto target = source.parent_path() / L"BMF_SaveBackups" / backup_id;
+    reject_links(target);
+    fs::create_directory(target.parent_path());
+    require(fs::create_directory(target), "Backup already exists");
+    for (const auto& directory : save_directories) {
+        auto destination = target / directory;
+        reject_links(destination);
+        fs::create_directories(destination);
+    }
+    return "{\"status\":\"complete\",\"files\":" + result + ",\"target\":" + quote(target.generic_u8string()) + '}';
 }
 
 void write_result(const fs::path& path, const std::string& content) {
@@ -162,7 +176,9 @@ void run_job(const Job& job) {
         if (job.operation == "identify") {
             result = "{\"status\":\"complete\",\"identity\":" + identify(job.root) + '}';
         } else if (job.operation == "list-saves") {
-            result = "{\"status\":\"complete\",\"files\":" + list_saves(job.argument) + '}';
+            result = list_saves(job.argument);
+        } else if (job.operation == "prepare-save-backup") {
+            result = list_saves(job.argument, job.id);
         } else {
             auto input = job.root / (job.id + L".settings.json");
             auto target = job.root / L"Data/settings.json";
@@ -195,7 +211,8 @@ bool start(const char* wire, unsigned size) {
     auto second = first == std::string::npos ? first : request.find('\0', first + 1);
     if (second == std::string::npos) return false;
     auto operation = request.substr(0, first);
-    if (operation != "identify" && operation != "list-saves" && operation != "settings") return false;
+    if (operation != "identify" && operation != "list-saves" &&
+        operation != "prepare-save-backup" && operation != "settings") return false;
     auto id = request.substr(first + 1, second - first - 1);
     if (!std::regex_match(id, std::regex("job_[A-Za-z0-9_-]{1,80}"))) return false;
 

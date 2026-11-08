@@ -1,4 +1,7 @@
-#include "../../NativeSource/25940006/pcl_blade_library_151761.cpp"
+#ifndef PCL_BLADE_FIXTURE_ADAPTER
+#define PCL_BLADE_FIXTURE_ADAPTER "../../NativeSource/25940006/pcl_blade_library_151761.cpp"
+#endif
+#include PCL_BLADE_FIXTURE_ADAPTER
 static u8 active_mem[0x200],source_mem[0x200],merged_mem[0x200],backup_mem[0x200];
 static u8 pool[64][64];static u32 used=0,copies=0,refreshes=0;
 static bool fail_refresh=false,bad_merge=false;
@@ -46,6 +49,9 @@ static bool logical_equal(u64 a,u64 b) {
 }
 static int replace() {return blade_replace((u64)active_mem,(u64)source_mem,(u64)merged_mem,(u64)backup_mem,123,&copy_fixture,&refresh_fixture);}
 extern "C" int main() {
+#ifdef PCL_BLADE_CACHE
+    if(!valid_cache_parts(0)||valid_cache_parts(1)||valid_cache_parts(6001))return 11;
+#endif
     reset();u8 view[0x100];blade_view(view,(u64)source_mem,0);
     if(rd<u32>((u64)view+0x68)!=0xFFFFFFFF)return 1;
     for(u32 i=0;i<0x100;++i) {
