@@ -187,17 +187,20 @@ static void make_relay(u64 at,u8 register_code,u64 target) {
     wr<u8>(at+3,0x48);wr<u8>(at+4,0xB8);wr<u64>(at+5,target);
     wr<u8>(at+13,0xFF);wr<u8>(at+14,0xE0);
 }
-static int install() {
-    int guard=image_guard();if(guard!=1||installed)return guard;
-    u64 site=image+0x4640E45,factory_site=image+0x4640DE9;
+static u64 allocate_relay(u64 site) {
     for(u64 distance=0x10000;distance<0x70000000;distance+=0x10000) {
         for(int direction=0;direction<2;++direction) {
             u64 where=(site&~0xFFFFull)+(direction?distance:0-distance);
-            relay=(u64)VirtualAlloc((void*)where,0x1000,0x3000,0x04);
-            if(relay)break;
+            u64 allocation=(u64)VirtualAlloc((void*)where,0x1000,0x3000,0x04);
+            if(allocation)return allocation;
         }
-        if(relay)break;
     }
+    return 0;
+}
+static int install() {
+    int guard=image_guard();if(guard!=1||installed)return guard;
+    u64 site=image+0x4640E45,factory_site=image+0x4640DE9;
+    relay=allocate_relay(site);
     if(!relay)return -10;
     make_relay(relay,0xF8,(u64)&receive);
     make_relay(relay+32,0xF9,(u64)&receive_factory);
@@ -282,4 +285,112 @@ extern "C" __declspec(dllexport) int pcl_download_failed(void* L) {
     u64 widget=0;if(!arg(L,1,widget)||widget!=capture.widget)return result(L,-1);
     if(capture.status==1||capture.status==-9)capture.status=-8;
     return result(L,capture.status);
+}
+
+// The stock upload continuation serializes an existing UPiece synchronously.
+// The hidden callback widget gets a deferred data host only for that call.
+static u64 share_widget=0;
+static Weak share_weak={};
+static u32 share_thread=0;
+static int share_status=0;
+static u8 share_code[128]={};
+static bool share_installed=false;
+static const u64 share_sites[]={0x46411C4,0x46412E8,0x464131F};
+static const u8 share_original[][5]={{0xE8,0xD7,0x31,0xF3,0xFF},{0xE8,0xE3,0x2F,0xF3,0xFF},{0xE8,0xAC,0x2F,0xF3,0xFF}};
+static u8 share_patches[3][5]={};
+
+static bool share_matches(u64 widget) {
+    return widget==share_widget && GetCurrentThreadId()==share_thread && weak_valid(share_weak,widget);
+}
+static void share_success(u64 widget,u64 message) {
+    if(!share_matches(widget)) {
+        ((void(*)(u64,u64))(image+0x45743A0))(widget,message);
+        return;
+    }
+    if(share_status!=1)return;
+    share_status=-8;
+    if(!ptr(message))return;
+    u64 chars=rd<u64>(message);
+    int count=rd<int>(message+8)-1; // FString count includes the terminator.
+    if(!ptr(chars)||count<1||count>128)return;
+    for(int i=0;i<count;++i) {
+        auto c=rd<unsigned short>(chars+2ull*i);
+        if(!c||c>127)return;
+        share_code[i]=(u8)c;
+    }
+    share_status=count+1;
+}
+static void share_failure(u64 widget,u64 message) {
+    if(!share_matches(widget)) {
+        ((void(*)(u64,u64))(image+0x45742D0))(widget,message);
+        return;
+    }
+    if(share_status==1)share_status=-8;
+}
+static int install_share() {
+    const u8 prefix[]={0x48,0x89,0x5C,0x24,0x20,0x55,0x56,0x57,0x41,0x54,0x41,0x55,0x41,0x56,0x41,0x57};
+    if(!same(image+0x4641040,prefix,sizeof(prefix)))return -4;
+    for(int i=0;i<3;++i)
+        if(!same(image+share_sites[i],share_installed?share_patches[i]:share_original[i],5))return -4;
+    if(share_installed)return 1;
+    const u64 thunk=allocate_relay(image+share_sites[0]);
+    if(!thunk)return -10;
+    for(int i=0;i<2;++i) {
+        u64 at=thunk+16*i;
+        wr<u8>(at,0x48);wr<u8>(at+1,0xB8);wr<u64>(at+2,i?(u64)&share_failure:(u64)&share_success);
+        wr<u8>(at+10,0xFF);wr<u8>(at+11,0xE0);
+    }
+    u32 old=0;
+    if(!VirtualProtect((void*)thunk,0x1000,0x20,&old))return -11;
+    FlushInstructionCache((void*)-1,(void*)thunk,32);
+    for(int i=0;i<3;++i) {
+        make_call(share_patches[i],image+share_sites[i],thunk+(i?16:0));
+        if(!write_call(image+share_sites[i],share_patches[i])) {
+            for(int j=0;j<=i;++j)write_call(image+share_sites[j],share_original[j]);
+            return -12;
+        }
+    }
+    share_installed=true;
+    return 1;
+}
+
+extern "C" __declspec(dllexport) int bmf_creative_share_send(void* L) {
+    u64 widget=0,host=0,piece=0;
+    if(!arg(L,1,widget)||!arg(L,2,host)||!arg(L,3,piece)) return result(L,-1);
+    const int guard=image_guard();
+    if(guard!=1) return result(L,guard);
+    const u8 prologue[]={0x48,0x89,0x5C,0x24,0x10,0x48,0x89,0x74,0x24,0x18,0x48,0x89,0x7C,0x24,0x20,0x55};
+    const u8 serialize[]={0x48,0x8B,0x89,0x28,0x03,0,0,0x48,0x8D,0x55,0xA0,
+                          0x48,0x8B,0x89,0x28,0x04,0,0,0xE8,0x65,0xAF,0xF4,0xFF};
+    if(!same(image+0x46577B0,prologue,sizeof(prologue)) ||
+       !same(image+0x46577F4,serialize,sizeof(serialize))) return result(L,-4);
+    u64 objects[]={widget,host,piece};
+    for(u64 object:objects) {
+        if(!ptr(object)) return result(L,-5);
+        Weak weak={};
+        ((void(*)(Weak*,u64*))(image+0x1499320))(&weak,&object);
+        if(!weak_valid(weak,object)) return result(L,-5);
+    }
+    if(rd<u64>(widget+0x328)!=host || rd<u64>(host+0x428)!=piece) return result(L,-5);
+    const int installed=install_share();
+    if(installed!=1)return result(L,installed);
+    share_widget=widget;share_thread=GetCurrentThreadId();share_status=1;
+    ((void(*)(Weak*,u64*))(image+0x1499320))(&share_weak,&widget);
+    __try {
+        ((void(*)(u64))(image+0x46577B0))(widget);
+    } __except(1) {
+        share_status=-16;
+        return result(L,-16);
+    }
+    return result(L,1);
+}
+extern "C" __declspec(dllexport) int bmf_creative_share_status(void* L) {
+    u64 widget=0;
+    if(!arg(L,1,widget)||!share_matches(widget))return result(L,-5);
+    return result(L,share_status);
+}
+extern "C" __declspec(dllexport) int bmf_creative_share_byte(void* L) {
+    u64 widget=0,index=0;
+    if(!arg(L,1,widget)||!arg(L,2,index)||!share_matches(widget)||share_status<2||index>=(u64)(share_status-1))return result(L,-5);
+    return result(L,share_code[index]);
 }

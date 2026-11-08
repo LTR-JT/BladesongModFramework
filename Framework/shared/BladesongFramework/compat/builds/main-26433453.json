@@ -4,10 +4,14 @@
   "branch": "main",
   "buildid": "26433453",
   "sha256": "a64202ae9a2f62d4e50e53f4b3f5a9df525dfcd0f1d1230531ed600c434268d0",
-  "status": "Main hotfix 26433453: Parts prefab placement, Blade import and local cache. Upload is unavailable.",
+  "status": "Main hotfix 26433453: Parts placement and upload, Blade import and local cache. Blade upload is unavailable.",
   "overrides": {},
   "legacy_pcl_native_verified": false,
   "native_helpers": {
+    "pcl_held_upload_151725b.dll": {
+      "verified": true,
+      "path": "native/26433453/pcl_held_upload_151725b.dll"
+    },
     "pcl_blade_library_151761.dll": {
       "verified": true,
       "path": "native/26433453/pcl_blade_library_151761.dll"

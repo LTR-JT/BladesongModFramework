@@ -89,6 +89,17 @@ for _,kind in ipairs({'Overlay','ContentWidget'})do
  E.pcl151762_remove_selection_hit(record)
  assert(card.children[1]==content and #card.children==1 and not hit.parent)
 end
+local canvas,corner=panel('CanvasPanel'),object()
+function canvas:AddChildToCanvas(widget)
+ assert(widget==corner)
+ return {
+  SetAnchors=function(_,anchors)assert(anchors.Minimum.X==1 and anchors.Minimum.Y==0 and anchors.Maximum.X==1 and anchors.Maximum.Y==0)end,
+  SetAlignment=function(_,align)assert(align.X==1 and align.Y==0)end,
+  SetOffsets=function(_,offsets)assert(offsets.Left==-10 and offsets.Top==10 and offsets.Right==72 and offsets.Bottom==72)end,
+  SetZOrder=function(_,z)assert(z==1000)end,
+ }
+end
+E.pcl151762_mount_selection_hit({view={WidgetTree={RootWidget=canvas}}},corner,72)
 print('PASS: full-card selection target layers above and restores the native card')
 
 local piece=object();piece.WeaponDesignDefinition={AppliedSwordParts={1,2},BladeSwordParts={1}}
@@ -130,3 +141,93 @@ end}end
 E.pcl151762_exit_to_main(state);assert(travelled==1 and cleaned==1)
 state.busy=true;assert(not pcall(E.pcl151762_exit_to_main,state));assert(travelled==1 and cleaned==1)
 print('PASS: Creative Main menu cleans up its UI and travels directly, without opening the escape menu; busy operations block travel')
+
+-- Conjure only registers a fully downloaded piece in the original Creative
+-- inventory. Sharing copies the server's code for the card's own piece.
+local queued,hidden,added={},0,{}
+local game_state,game_mode,inventory=object(),object(),object()
+local home=object()
+local form={SetVisibility=function()end}
+local input={text='Alpha-Bravo-Charlie',GetText=function(self)return self.text end,SetText=function(self,text)self.text=text end}
+local piece_class,entry_class=object(),object()
+local piece=object()
+local service,holder=object(),object()
+holder.IsA=function(_,class)return class==entry_class end
+holder.GetClass=function()return entry_class end
+for _,widget in ipairs({service,holder})do
+ widget.SetVisibility=function()end
+ widget.RemoveFromParent=function(self)if self.mounted then hidden=hidden-1;self.mounted=false end end
+end
+home.GetClass=function()return home end
+home.PieceItemsCollection={ItemTemplate=entry_class}
+local status,saved,fail_save=0,0,false
+local bridge={
+ status=function()return status end,
+ arm_home=function(widget,gm,target,class,pc)
+  assert(widget==service.id and gm==game_mode.id and target==holder.id and class==entry_class.id and pc==piece_class.id)
+  status=1;return 1
+ end,
+ cancel=function()status=-9 end,
+}
+function service:DownloadPiece(code)assert(code=='alpha-bravo-charlie')end
+function inventory:AddObject(value)assert(value==piece);added[#added+1]=value end
+function inventory:RemoveObject(value)assert(value==piece and added[#added]==value);table.remove(added)end
+function game_state:SaveGame()if fail_save then error('save failed')end;saved=saved+1 end
+local home_state={home=home,form=form,input=input,download_bridge=bridge,hidden={AddChild=function(_,widget)hidden=hidden+1;widget.mounted=true end}}
+E.PCL151762_HOME=home_state
+E.pcl151762_context=function()return game_state,inventory,game_mode end
+E.pcl151762_status=function(_,message)home_state.notice=message end
+E.pcl151762_controls=function()end
+E.pcl15179_schedule=function(_,callback)queued[#queued+1]=callback end
+E.pcl15171_create_widget=function(_,class)return class==entry_class and holder or service end
+E.StaticFindObject=function(path)return path:match('UWPieceInventoryEntry$')and entry_class or piece_class end
+E.pcl151726_has_cache=function()error('Conjure must keep the complete sword rather than use a prefab cache')end
+E.pcl151762_start_import(home_state,input.text,true)
+assert(hidden==2 and #added==0 and saved==0)
+table.remove(queued,1)()
+assert(#queued==1 and #added==0)
+holder.BoundPiece=piece;status=2;table.remove(queued,1)()
+assert(hidden==0 and #added==1 and saved==1 and input.text=='' and E.PCL151762_IMPORT==nil)
+fail_save=true;status=0
+E.pcl151762_start_import(home_state,'alpha-bravo-charlie',true)
+status=2;table.remove(queued,1)()
+assert(hidden==0 and #added==1 and saved==1 and E.PCL151762_IMPORT==nil)
+fail_save=false;status=0
+local opened=0
+function game_mode:EnterForgeMode(value)
+ assert(value==piece and added[#added]==piece and saved==2 and E.PCL151762_IMPORT==nil)
+ opened=opened+1
+end
+E.BMF_CREATIVE_AUTO_LOAD=true
+E.pcl151762_start_import(home_state,'alpha-bravo-charlie',true)
+E.BMF_CREATIVE_AUTO_LOAD=false
+status=2;table.remove(queued,1)()
+assert(opened==1 and saved==2 and hidden==0)
+
+local view,host=object(),object()
+view.BoundPiece=piece
+game_mode.ForgeModeClass=object()
+E.gameplay_statics_15=function()
+ return {BeginDeferredActorSpawnFromClass=function(_,world,class)
+  assert(world==home and class==game_mode.ForgeModeClass);return host
+ end}
+end
+function host:K2_DestroyActor()self.valid=false end
+local code,copied='alpha-bravo-charlie',nil
+home_state.share_bridge={
+ send=function(widget,actor,sword)
+  assert(widget==service.id and actor==host.id and sword==piece.id and service.ForgeMode==host and host.Piece==piece)
+  status=1;return 1
+ end,
+ status=function(widget)assert(widget==service.id);return status end,
+ byte=function(widget,index)assert(widget==service.id);return code:byte(index+1)end,
+ copy=function(size,...)assert(size==#code);copied=string.char(...);return 1 end,
+}
+E.bmf_creative_share(home_state,{piece=piece,view=view})
+assert(not host.valid and hidden==1 and home_state.share_request and not copied)
+table.remove(queued,1)()
+assert(#queued==1 and not copied)
+status=#code+1;table.remove(queued,1)()
+assert(copied==code and hidden==0 and not home_state.share_request and saved==2)
+assert(not pcall(E.bmf_creative_share,home_state,{piece=object(),view=view}))
+print('PASS: Conjure saves the complete sword directly, rolls back on save errors, and Magic Words shares only the selected card')

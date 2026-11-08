@@ -10,6 +10,34 @@ end
 E.BMF_CREATIVE_ROOT=root;E.BMF_CREATIVE_HAS_PROVIDER=options.provider==true
 for key,value in pairs(options)do if key~='provider'then E[key]=value end end
 local function valid(object)return F._valid(object)end
+E.bmf_creative_download_bridge=function()
+ local path,why=F.GetNativeHelper('pcl_download_capture_151762.dll')
+ if not path then return nil,why end
+ local bridge={}
+ for _,name in ipairs({'probe','arm_home','status','cancel','failed'})do
+  local fn,err=package.loadlib(path,'pcl_download_'..name)
+  if not fn then return nil,err end
+  bridge[name]=fn
+ end
+ if bridge.probe()~=1 then return nil,'Download adapter does not match the game executable' end
+ return bridge
+end
+E.bmf_creative_share_bridge=function()
+ local path,why=F.GetNativeHelper('pcl_download_capture_151762.dll')
+ if not path then return nil,why end
+ local bridge={}
+ for _,name in ipairs({'send','status','byte'})do
+  local fn=package.loadlib(path,'bmf_creative_share_'..name)
+  if not fn then return nil,'Sharing from Creative is unavailable on this game build' end
+  bridge[name]=fn
+ end
+ local cache,err=F.GetNativeHelper('pcl_local_cache_151733.dll')
+ if not cache then return nil,err end
+ local copy,copy_error=package.loadlib(cache,'pcl_cache_copy_word')
+ if not copy then return nil,copy_error end
+ bridge.copy=copy
+ return bridge
+end
 if not options.provider then
  E.is_valid=valid
  E.log=function(message)print('[BMF Creative] '..tostring(message)..'\n')end

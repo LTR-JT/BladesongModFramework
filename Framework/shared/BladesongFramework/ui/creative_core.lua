@@ -39,7 +39,11 @@ function pcl151762_snapshot(state)
     return list,table.concat(keys,','),gs,collection
 end
 function pcl151762_status(state,message)
-    if state and is_valid(state.message)then state.message:SetText(pcl15171_to_text(message or ''));state.message:SetVisibility(message and message~=''and 0 or 1)end
+    if state and is_valid(state.message)then
+        local visible=message and message~=''
+        state.message:SetText(pcl15171_to_text(message or ''));state.message:SetVisibility(visible and 0 or 1)
+        if is_valid(state.tools)then state.tools:SetVisibility((state.open or (visible and not state.story_open)) and 0 or 1)end
+    end
     log('PCL15_17_62_HOME '..tostring(message or ''))
 end
 function pcl151762_button(state,parent,caption,kind,extra)
@@ -210,39 +214,76 @@ function pcl151762_import_done(request,message)
     PCL151762_IMPORT=nil
     for _,widget in ipairs({request.service,request.holder})do if is_valid(widget)then pcall(function()widget:RemoveFromParent()end)end end
     if PCL151762_HOME==request.state then
-        if request.state.open then pcl151762_render(request.state)end
+        if request.mode~='creative' and request.state.open then pcl151762_render(request.state)end
         pcl151762_status(request.state,message);pcl151762_controls(request.state)
     end
 end
-function pcl151762_start_import(state,raw)
-    assert(state.view=='parts' or state.view=='blades','Select a library first')
+function pcl151762_start_import(state,raw,creative)
+    if creative then
+        assert(not state.open and not state.story_open,'Open the Creative library first')
+    else
+        assert(state.view=='parts' or state.view=='blades','Select a library first')
+    end
     assert(not PCL151762_IMPORT and not PCL151719_IMPORT and not PCL151725_UPLOAD_PENDING,'An import or upload is already running')
-    local _,_,gm=pcl151762_context(state)
+    local gs,collection,gm=pcl151762_context(state)
     local code=pcl15171_trim(raw):lower();assert(code:match('^%a+%-%a+%-%a+$'),'Enter a valid Magic Word')
-    if pcl151726_has_cache(code)then assert(pcl15171_add_code(code));pcl151762_render(state);pcl151762_status(state,'Already saved in this library.');return end
-    local bridge,why=pcl151719_bridge();assert(bridge,tostring(why))
+    if not creative and pcl151726_has_cache(code)then assert(pcl15171_add_code(code));pcl151762_render(state);pcl151762_status(state,'Already saved in this library.');return end
+    local bridge,why
+    if creative then bridge=state.download_bridge else bridge,why=pcl151719_bridge()end
+    assert(bridge,why or 'Creative download adapter unavailable')
     assert(bridge.status()~=1 and bridge.status()~=-9,'The previous download is still pending')
     local service=pcl15171_create_widget(state.home,state.home:GetClass())
     local holder=pcl15171_create_widget(state.home,state.home.PieceItemsCollection.ItemTemplate)
     local entryclass=StaticFindObject('/Script/Bladesong.UWPieceInventoryEntry');local piececlass=StaticFindObject('/Script/Bladesong.Piece')
     assert(is_valid(service) and is_valid(holder) and is_valid(entryclass) and holder:IsA(entryclass) and is_valid(piececlass),'Library download data objects unavailable')
     holder:SetVisibility(1);service:SetVisibility(1);state.hidden:AddChild(holder);state.hidden:AddChild(service)
-    local request={state=state,service=service,holder=holder,bridge=bridge,code=code,mode=state.view,started=os.clock(),gm=gm}
+    local request={state=state,service=service,holder=holder,bridge=bridge,code=code,mode=creative and 'creative' or state.view,started=os.time(),auto_load=creative and BMF_CREATIVE_AUTO_LOAD==true}
     local armed=bridge.arm_home(service:GetAddress(),gm:GetAddress(),holder:GetAddress(),holder:GetClass():GetAddress(),piececlass:GetAddress())
-    assert(armed==1,'Library-only download refused ('..tostring(armed)..')')
+    if armed~=1 then
+        service:RemoveFromParent();holder:RemoveFromParent()
+        error('Download could not start ('..tostring(armed)..')',0)
+    end
     PCL151762_IMPORT=request
     local sent,send_err=pcall(function()service:DownloadPiece(code)end)
     if not sent then bridge.cancel();pcl151762_import_done(request,'Download could not start.');error(tostring(send_err))end
-    state.form:SetVisibility(1);pcl151762_status(state,'Importing into the '..state.view..' library...');pcl151762_controls(state)
+    state.form:SetVisibility(1);pcl151762_status(state,creative and 'Conjuring sword...' or ('Importing into the '..state.view..' library...'));pcl151762_controls(state)
     local function poll()
         if PCL151762_IMPORT~=request then return end
         local ok,err=pcall(function()
             if PCL151762_HOME~=state or not pcl151762_visible(state.home)then bridge.cancel();pcl151762_import_done(request,'Import cancelled: Creative screen changed.');return end
             if request.failed then pcl151762_import_done(request,'Magic Word download failed.');return end
             local status=bridge.status()
-            if status==1 then assert(os.clock()-request.started<125,'Download timed out');pcl15179_schedule(100,poll);return end
+            if status==1 then assert(os.time()-request.started<125,'Download timed out');pcl15179_schedule(50,poll);return end
             assert(status==2,'Download stopped ('..tostring(status)..')')
             local source=holder.BoundPiece;assert(is_valid(source),'Downloaded data unavailable');local piece=source
+            if creative then
+                local current_gs,current_collection,current_gm=pcl151762_context(state)
+                assert(current_gs:GetAddress()==gs:GetAddress() and current_collection:GetAddress()==collection:GetAddress() and current_gm:GetAddress()==gm:GetAddress(),'Creative inventory changed')
+                local started=os.clock()
+                collection:AddObject(source)
+                local saved,save_error=pcall(function()gs:SaveGame()end)
+                if not saved then
+                    collection:RemoveObject(source)
+                    error(save_error,0)
+                end
+                pcall(function()
+                    if pcl15171_trim(pcl15171_from_text(state.input:GetText())):lower()==code then
+                        state.input:SetText(pcl15171_to_text(''))
+                    end
+                end)
+                pcl151762_import_done(request,'Sword added to your Creative library.')
+                if request.auto_load then
+                    local opened,why=pcall(function()gm:EnterForgeMode(source)end)
+                    if not opened then
+                        pcl151762_status(state,'Sword saved. Could not open the Forge.')
+                        log('BMF_CREATIVE_AUTO_LOAD_FAILED '..tostring(why))
+                    end
+                    return
+                end
+                bmf_creative_queue_share_cards(state)
+                log('BMF_CREATIVE_CONJURE_MS '..math.floor((os.clock()-started)*1000)..' forge_opened=false')
+                return
+            end
             if request.mode=='blades'then
                 piece=pcl151761_fresh_piece(holder,source)
                 assert(pcl151761_bridge().snapshot(source:GetAddress(),piece:GetAddress(),source:GetClass():GetAddress())==1,'Blade extraction failed')
@@ -260,7 +301,7 @@ function pcl151762_start_import(state,raw)
         end)
         if not ok then bridge.cancel();pcl151762_import_done(request,'Import stopped: '..tostring(err))end
     end
-    pcl15179_schedule(100,poll)
+    pcl15179_schedule(50,poll)
 end
 -- Hide the stock layout during construction until the mod has mounted.
 -- Restore the original opacity on failure or if the widget never enters view.
@@ -389,7 +430,7 @@ function pcl151762_library_delete(state)
 end
 
 function pcl151762_exit_to_main(state)
- assert(not state.busy and not state.confirm and not PCL151762_IMPORT,'Finish the current operation first')
+ assert(not state.busy and not state.confirm and not PCL151762_IMPORT and not state.share_request,'Finish the current operation first')
  local player=state.home:GetOwningPlayer();assert(is_valid(player),'Creative player is unavailable')
  -- Creative Home has no active Forge operation. Travel directly to the game's
  -- MainMenu map rather than opening a pause widget and synthesizing its click.
@@ -398,6 +439,80 @@ function pcl151762_exit_to_main(state)
  pcl151762_cleanup_home()
  statics:OpenLevel(player,level,true,'')
 end
+local function finish_creative_share(state,request,message)
+    if state.share_request~=request then return end
+    state.share_request=nil
+    if is_valid(request.widget)then request.widget:RemoveFromParent()end
+    if PCL151762_HOME==state then pcl151762_status(state,message);pcl151762_controls(state)end
+end
+
+function bmf_creative_share(state,action)
+    assert(not state.open and not state.story_open and not state.share_request and not PCL151762_IMPORT,'Finish the current operation first')
+    local piece,view=action.piece,action.view
+    assert(is_valid(view) and is_valid(piece) and is_valid(view.BoundPiece) and view.BoundPiece:GetAddress()==piece:GetAddress(),'Sword card changed')
+    local _,_,gm=pcl151762_context(state)
+    local bridge=assert(state.share_bridge,'Sharing from Creative is unavailable')
+    local class=StaticFindObject('/Script/Bladesong.UWForgeMode')
+    assert(is_valid(class) and is_valid(gm.ForgeModeClass),'Sword sharing is unavailable')
+    local widget=pcl15171_create_widget(state.home,class)
+    assert(is_valid(widget),'Could not create the sword sharing service')
+    local request={widget=widget}
+    state.share_request=request
+    local host
+    local ok,err=pcall(function()
+        widget:SetVisibility(1);state.hidden:AddChild(widget)
+        local transform={Rotation={X=0,Y=0,Z=0,W=1},Translation={X=0,Y=0,Z=0},Scale3D={X=1,Y=1,Z=1}}
+        -- Only the saved Piece is needed. Leave the actor deferred so it never
+        -- constructs the Forge, spawns part actors, or runs BeginPlay.
+        host=gameplay_statics_15():BeginDeferredActorSpawnFromClass(state.home,gm.ForgeModeClass,transform,1,nil,2)
+        assert(is_valid(host),'Could not prepare the sword data')
+        host.Piece=piece;widget.ForgeMode=host
+        local sent=bridge.send(widget:GetAddress(),host:GetAddress(),piece:GetAddress())
+        assert(sent==1,'Sword sharing could not start ('..tostring(sent)..')')
+    end)
+    if is_valid(host)then
+        pcall(function()widget.ForgeMode=nil end)
+        pcall(function()host:K2_DestroyActor()end)
+    end
+    if not ok then finish_creative_share(state,request,'Could not share this sword.');error(err,0)end
+    pcl151762_status(state,'Generating Magic Words...');pcl151762_controls(state)
+    local deadline=os.time()+125
+    local function poll()
+        if PCL151762_HOME~=state or state.share_request~=request then return end
+        if not is_valid(widget) or not pcl151762_visible(state.home)then
+            finish_creative_share(state,request,'')
+            return
+        end
+        local address=widget:GetAddress()
+        local status=bridge.status(address)
+        if status==1 then
+            if os.time()<deadline then pcl15179_schedule(100,poll)
+            else finish_creative_share(state,request,'Sharing timed out. Try again.')end
+            return
+        end
+        if status<2 or status>129 then
+            finish_creative_share(state,request,'Could not generate Magic Words. Try again.')
+            return
+        end
+        local chars={}
+        for i=0,status-2 do
+            local byte=bridge.byte(address,i)
+            if byte<1 or byte>127 then break end
+            chars[#chars+1]=string.char(byte)
+        end
+        local code=pcl15171_trim(table.concat(chars))
+        if #chars~=status-1 or not code:match('^%a+%-%a+%-%a+$')then
+            finish_creative_share(state,request,'Could not generate Magic Words. Try again.')
+            return
+        end
+        local args={#code}
+        for i=1,#code do args[#args+1]=code:byte(i)end
+        local ok,copied=pcall(bridge.copy,table.unpack(args))
+        finish_creative_share(state,request,(ok and copied==1 and 'Copied Magic Words: ' or 'Magic Words: ')..code)
+    end
+    pcl15179_schedule(100,poll)
+end
+
 function pcl151762_dispatch(action)
     if not action.kind or action.kind:sub(1,5)~='home_'then return false end
     local state=action.home_state or PCL151762_HOME
@@ -405,6 +520,16 @@ function pcl151762_dispatch(action)
     local ok,err=pcall(function()
         pcl151762_context(state)
         local kind=action.kind
+        if kind=='home_conjure'then pcl151762_start_import(state,pcl15171_from_text(state.input:GetText()),true);return end
+        if kind=='home_share'then bmf_creative_share(state,action);return end
+        if (PCL151762_IMPORT and PCL151762_IMPORT.mode=='creative') or state.share_request then return end
+        if kind=='home_auto_load'then
+            if not state.open and not state.story_open then
+                BMF_CREATIVE_AUTO_LOAD=not BMF_CREATIVE_AUTO_LOAD
+                pcl151762_controls(state)
+            end
+            return
+        end
         if kind=='home_folder_tab'then PCL_FOLDER_TABS.select(action.tab_id,state);pcl151762_controls(state);return end
         if kind=='home_exit'then pcl151762_exit_to_main(state);return end
         if kind=='home_close'then pcl151762_close(state);return end
@@ -533,12 +658,16 @@ function pcl151762_context(state)
     assert(not is_valid(gs.RecentStoryModeSwordsInventory) or original:GetAddress()~=gs.RecentStoryModeSwordsInventory:GetAddress(),'Story inventory is excluded')
     return gs,original,gm,utils
 end
-function pcl151762_remove_selection_hit(record)
-    if is_valid(record.selection_hit)then record.selection_hit:RemoveFromParent()end
-    local swap=record.selection_overlay
+local function remove_card_overlay(record,widget)
+    if is_valid(widget)then widget:RemoveFromParent()end
+    local swap=record.card_overlay
     if swap and is_valid(swap.original)then swap.original:RemoveFromParent()end
     pcl151762_restore_swap(swap)
-    record.selection_hit=nil;record.selection_overlay=nil
+    record.card_overlay=nil
+end
+function pcl151762_remove_selection_hit(record)
+    remove_card_overlay(record,record.selection_hit)
+    record.selection_hit=nil
 end
 function pcl151762_restore_cards(state)
     state.card_patch_key=nil
@@ -549,14 +678,22 @@ function pcl151762_restore_cards(state)
         pcall(function()if is_valid(entry.button)then entry.button.bApplyAlphaOnDisable=entry.apply_alpha;entry.button:SetIsInteractionEnabled(entry.interaction);entry.button:SetIsFocusable(entry.focusable);entry.button:SetRenderOpacity(entry.opacity or 1)end end)
     end
     pcl151762_forget_buttons(state.row_buttons);state.row_buttons={};state.native_cards={};state.selection_buttons={}
+    for _,record in pairs(state.share_cards or {})do bmf_creative_restore_share_card(record)end
+    state.share_cards=nil
 end
-function pcl151762_mount_selection_hit(record,hit)
+function pcl151762_mount_selection_hit(record,hit,corner_size)
     local tree=record.view.WidgetTree
     local root=tree and tree.RootWidget
     if pcl151762_class(root,'CanvasPanel')then
         local slot=root:AddChildToCanvas(hit)
-        slot:SetAnchors({Minimum={X=0,Y=0},Maximum={X=1,Y=1}})
-        slot:SetOffsets({Left=0,Top=0,Right=0,Bottom=0})
+        if corner_size then
+            slot:SetAnchors({Minimum={X=1,Y=0},Maximum={X=1,Y=0}})
+            slot:SetAlignment({X=1,Y=0})
+            slot:SetOffsets({Left=-10,Top=10,Right=corner_size,Bottom=corner_size})
+        else
+            slot:SetAnchors({Minimum={X=0,Y=0},Maximum={X=1,Y=1}})
+            slot:SetOffsets({Left=0,Top=0,Right=0,Bottom=0})
+        end
         slot:SetZOrder(1000)
     else
         local overlay=root
@@ -565,14 +702,88 @@ function pcl151762_mount_selection_hit(record,hit)
             local content=root:GetContent()
             assert(is_valid(content),'Creative card content unavailable')
             overlay=pcl151723_new(record.view,'Overlay')
-            record.selection_overlay=pcl151762_swap_button(content,overlay)
+            record.card_overlay=pcl151762_swap_button(content,overlay)
             local visual=overlay:AddChildToOverlay(content)
             visual:SetHorizontalAlignment(0);visual:SetVerticalAlignment(0)
         end
         local slot=overlay:AddChildToOverlay(hit)
-        slot:SetHorizontalAlignment(0);slot:SetVerticalAlignment(0)
+        slot:SetHorizontalAlignment(corner_size and 3 or 0);slot:SetVerticalAlignment(corner_size and 1 or 0)
+        if corner_size then slot:SetPadding({Left=0,Top=10,Right=10,Bottom=0})end
     end
 end
+function bmf_creative_restore_share_card(record)
+    pcall(remove_card_overlay,record,record.icon)
+    if is_valid(record.button)then
+        pcl151762_forget_buttons({record.button})
+        record.button:RemoveFromParent()
+    end
+end
+
+local function share_card_icon(state,view,piece)
+    local size=72
+    local button=pcl151723_button(state.panel,'',0)
+    button:SetStyle(state.share_style);button:SetMinDimensions(0,0)
+    button:SetIsEnabled(not state.share_request and not PCL151762_IMPORT)
+    local icon=pcl151723_new(view,'Image')
+    icon:SetBrushFromTexture(state.share_texture,false)
+    icon:SetDesiredSizeOverride({X=44,Y=44});icon:SetVisibility(3)
+    local face=pcl151723_new(view,'Overlay')
+    local hit=face:AddChildToOverlay(button);hit:SetHorizontalAlignment(0);hit:SetVerticalAlignment(0)
+    local art=face:AddChildToOverlay(icon);art:SetHorizontalAlignment(2);art:SetVerticalAlignment(2)
+    local box=pcl151723_new(view,'SizeBox')
+    box:SetWidthOverride(size);box:SetHeightOverride(size);box:SetContent(face)
+    local record={piece=piece:GetAddress(),view=view,button=button,icon=box}
+    local mounted,why=pcall(pcl151762_mount_selection_hit,record,box,size)
+    if not mounted then bmf_creative_restore_share_card(record);error(why,0)end
+    pcl15171_bind_button(button,{kind='home_share',home_state=state,panel=state.panel,piece=piece,view=view})
+    return record
+end
+
+function bmf_creative_update_share_cards(state)
+    if not is_valid(state.share_style)then
+        state.share_style=pcl15174_load_object('/Game/UI/Style/ButtonStyle_Round.ButtonStyle_Round_C')
+    end
+    if not is_valid(state.share_texture)then
+        state.share_texture=pcl15174_load_object('/Game/UI/ForgeMode/Icons/T_SwordmakingFeatureIcon_Share.T_SwordmakingFeatureIcon_Share')
+    end
+    assert(is_valid(state.share_style) and is_valid(state.share_texture),'Native share icon assets unavailable')
+    local control=state.home.PieceItemsCollection
+    local cards=state.share_cards or {}
+    state.share_cards=cards
+    local visible={}
+    for index=0,control.ItemPanel:GetChildrenCount()-1 do
+        local view=control:GetChildAt(index)
+        local piece=is_valid(view) and view.BoundPiece
+        if is_valid(piece) and is_valid(view.RemoveButton)then
+            local id,address=view:GetAddress(),piece:GetAddress()
+            visible[id]=true
+            local record=cards[id]
+            if record and record.piece~=address then
+                bmf_creative_restore_share_card(record)
+                record=nil;cards[id]=nil
+            end
+            if not record then
+                cards[id]=share_card_icon(state,view,piece)
+            end
+        end
+    end
+    for id,record in pairs(cards)do
+        if not visible[id]then bmf_creative_restore_share_card(record);cards[id]=nil end
+    end
+end
+
+function bmf_creative_queue_share_cards(state)
+    if not state.share_bridge or state.share_refresh_queued then return end
+    state.share_refresh_queued=true
+    pcl15179_schedule(1,function()
+        state.share_refresh_queued=false
+        if PCL151762_HOME==state and pcl151762_visible(state.home) and not state.open and not state.story_open then
+            local ok,err=pcall(bmf_creative_update_share_cards,state)
+            if not ok then log('BMF_CREATIVE_SHARE_CARDS_UNAVAILABLE '..tostring(err))end
+        end
+    end)
+end
+
 function pcl151762_patch_cards(state)
     if not state.open or state.patching then return end
     local control=state.home.PieceItemsCollection
@@ -653,33 +864,57 @@ function pcl151762_patch_cards(state)
 end
 function pcl151762_controls(state)
     local deleting=state.open and (state.view=='delete'or state.library_selecting);local locked=state.busy or state.confirm~=nil
+    local creative_busy=(PCL151762_IMPORT and PCL151762_IMPORT.mode=='creative') or state.share_request
     for _,button in ipairs({state.all,state.parts,state.blades})do pcl151762_action_visibility(state,button,state.open and not deleting and not state.story_open and 0 or 1);button:SetIsEnabled(not PCL151762_IMPORT and not locked)end
     for _,button in ipairs({state.select_all,state.clear,state.remove})do pcl151762_action_visibility(state,button,deleting and 0 or 1);button:SetIsEnabled(not locked)end
     pcl151762_action_visibility(state,state.cancel_confirm,deleting and state.confirm and 0 or 1)
-    if is_valid(state.tools)then state.tools:SetVisibility(state.open and 0 or 1)end
+    if is_valid(state.tools)then state.tools:SetVisibility((state.open or (not state.story_open and is_valid(state.message) and state.message:GetVisibility()==0)) and 0 or 1)end
     local n=pcl151762_selected_count(state)
     pcl151762_action_caption(state,state.remove,state.confirm and ('Confirm delete '..n)or ('Delete selected ('..n..')'))
     state.remove:SetIsEnabled(not state.busy and n>0)
-    if is_valid(state.exit_button)then state.exit_button:SetIsEnabled(not locked and not PCL151762_IMPORT)end
-    state.close:SetIsEnabled(not state.busy);if is_valid(state.nav_library)then state.nav_library:SetIsEnabled(not locked and not PCL151762_IMPORT)end
+    if is_valid(state.exit_button)then state.exit_button:SetIsEnabled(not locked and not PCL151762_IMPORT and not state.share_request)end
+    state.close:SetIsEnabled(not state.busy and not creative_busy);if is_valid(state.nav_library)then state.nav_library:SetIsEnabled(not locked and not PCL151762_IMPORT and not state.share_request)end
     pcl151762_action_opacity(state,state.close,(not state.open or deleting)and 1 or .40)
     pcl151762_action_opacity(state,state.nav_library,state.open and not deleting and 1 or .40)
     state.tab_opacity_dirty=true
     if is_valid(state.all)then pcl151762_action_opacity(state,state.all,state.view=='all'and 1 or .40)end
     pcl151762_action_opacity(state,state.parts,state.view=='parts'and 1 or .40);pcl151762_action_opacity(state,state.blades,state.view=='blades'and 1 or .40)
     pcl151762_magic_footer_visibility(state)
-    state.nav_delete:SetIsEnabled(not state.busy and not PCL151762_IMPORT and not state.story_open)
+    state.nav_delete:SetIsEnabled(not state.busy and not PCL151762_IMPORT and not state.share_request and not state.story_open)
     for _,stroke in ipairs(state.trash_strokes or {})do stroke:SetVisibility(deleting and 1 or 3)end
     for _,stroke in ipairs(state.cancel_strokes or {})do stroke:SetVisibility(deleting and 3 or 1)end
     state.nav_delete:SetToolTipText(pcl15171_to_text(''))
     pcl151762_action_opacity(state,state.nav_delete,state.story_open and .40 or 1)
     pcl151762_update_folder_tabs(state)
-    if is_valid(state.import_submit)then state.import_submit:SetIsEnabled(not locked and not PCL151762_IMPORT)end
+    if is_valid(state.import_submit)then state.import_submit:SetIsEnabled(not locked and not PCL151762_IMPORT and not state.share_request)end
+    if is_valid(state.conjure_submit)then state.conjure_submit:SetIsEnabled(not creative_busy)end
+    if is_valid(state.auto_load_button)then
+        pcl151762_action_caption(state,state.auto_load_button,BMF_CREATIVE_AUTO_LOAD and 'Auto-load: On' or 'Auto-load: Off')
+        state.auto_load_button:SetIsEnabled(not creative_busy)
+    end
+    for _,record in pairs(state.share_cards or {})do
+        if is_valid(record.button)then record.button:SetIsEnabled(not creative_busy)end
+    end
     for id,selection in pairs(state.selection_buttons or {})do
         selection.label:SetCaption(pcl15171_to_text(state.selected[id]and '[x] Selected'or '[ ] Select'))
         selection.hit:SetIsEnabled(not locked)
     end
 end
+local function restore_creative_conjure(state)
+    pcl151762_restore_swap(state.conjure_swap)
+    state.conjure_swap=nil
+end
+
+local function mount_creative_conjure(state)
+    if not state.download_bridge or not state.download_face or state.conjure_swap then return end
+    if not is_valid(state.conjure_submit)then
+        state.conjure_submit=pcl151762_button(state,nil,'Conjure','home_conjure')
+        pcl151762_remove_native_chrome(state.conjure_submit)
+        state.conjure_submit:SetRenderOpacity(.001)
+    end
+    state.conjure_swap=pcl151762_swap_button(state.home.DownloadButton,state.conjure_submit)
+end
+
 function pcl151762_native_view(state,show)
     if show then
         if state.download_face then state.download_face.widget:SetVisibility(0);state.download_face.label:SetText(pcl15171_to_text('Conjure'))end
@@ -692,7 +927,9 @@ function pcl151762_native_view(state,show)
         if is_valid(state.import_submit)then state.import_submit:RemoveFromParent();state.import_submit:SetVisibility(1)end
         for name,visibility in pairs(state.native_visibility or {})do local widget=state.home[name];if is_valid(widget)then widget:SetVisibility(visibility)end end
         if state.original_heading then state.heading:SetText(state.original_heading)end
+        if PCL151762_HOME==state then mount_creative_conjure(state);bmf_creative_queue_share_cards(state)else restore_creative_conjure(state)end
     else
+        restore_creative_conjure(state)
         if state.download_face then state.download_face.widget:SetVisibility(0);if state.view=='delete'then state.download_face.label:SetText(pcl15171_to_text('Conjure'))end end
         if state.view=='delete'and state.import_swap then pcl151762_restore_swap(state.import_swap);state.import_swap=nil;state.import_submit:SetVisibility(1)end
         for _,name in ipairs({'DownloadButton','MagicWordTextBox'})do
@@ -769,6 +1006,10 @@ function pcl151762_create_home(home)
     local reference={LeaveForgeModeButton=home.DownloadButton,AbilityHistoryPlaceholderText=home.PieceItemsCollectionHeadline}
     assert(is_valid(reference.LeaveForgeModeButton)and is_valid(reference.AbilityHistoryPlaceholderText),'Creative styles unavailable')
     local state={home=home,catalogue=home,panel=home,toolbar=toolbar,buttons={},row_buttons={},selected={},native_cards={},native_visibility={},view=PCL151761_MODE,open=false}
+    local download_ok,download=pcall(bmf_creative_download_bridge)
+    if download_ok then state.download_bridge=download end
+    local share_ok,share=pcall(bmf_creative_share_bridge)
+    if share_ok then state.share_bridge=share end
     PCL151762_HOME=state;PCL151723_UI[home:GetAddress()]={reference=reference,controls={}}
     state.heading=home.PieceItemsCollectionHeadline;state.original_heading=state.heading:GetText();state.input=home.MagicWordTextBox
     local root=pcl15171_widget_by_name(toolbar,'PCL_EntryRoot');root:SetWidthOverride(1200);root:SetMaxDesiredWidth(1200)
@@ -802,6 +1043,7 @@ function pcl151762_create_home(home)
     toolbar:AddToViewport(91);toolbar:SetDesiredSizeInViewport({X=1200,Y=84});toolbar:SetPositionInViewport({X=0,Y=0},false);toolbar:SetAnchorsInViewport({Minimum={X=.10,Y=.035},Maximum={X=.10,Y=.035}});toolbar:SetAlignmentInViewport({X=0,Y=0})
     pcl151762_controls(state);pcl151762_mount_folder_tabs(state);pcall(pcl151762_align_toolbar,state)
     pcl151762_refresh_part_counts(state)
+    bmf_creative_queue_share_cards(state)
     if BMF_CREATIVE_HAS_PROVIDER then
      pcl15179_schedule(1,function()
       if PCL151762_HOME~=state then return end
@@ -829,6 +1071,7 @@ function pcl151762_cleanup_home()
     end
     local request=PCL151762_IMPORT
     if request and request.state==state then PCL151762_IMPORT=nil;pcall(request.bridge.cancel) end
+    if state.share_request then pcall(finish_creative_share,state,state.share_request,'')end
     state.open=false;pcall(pcl151762_native_view,state,true);pcall(pcl151762_input,state,nil)
     local restored,err=pcall(pcl151762_restore_home_layout,state)
     if not restored then log('PCL15_17_62_HOME_RESTORE_ERROR '..tostring(err)) end
@@ -859,7 +1102,7 @@ function pcl151762_native_changed(context)
     local state=PCL151762_HOME;if not state or state.patching then return end
     local control=pcl15171_unwrap(context)
     if is_valid(control)and control:GetAddress()==state.home.PieceItemsCollection:GetAddress()then
-        if state.open then pcl151762_patch_cards(state)end
+        if state.open then pcl151762_patch_cards(state)else bmf_creative_queue_share_cards(state)end
         pcl151762_refresh_part_counts(state)
     end
 end
@@ -1207,6 +1450,9 @@ function pcl151762_move_magic_tip(state,fieldbox)
 end
 function pcl151762_magic_footer_visibility(state)
     for _,box in ipairs(state.magic_footer_boxes or {})do box:SetVisibility(state.story_open and 1 or 0)end
+    if is_valid(state.auto_load_button)then
+        pcl151762_action_visibility(state,state.auto_load_button,(state.open or state.story_open) and 1 or 0)
+    end
     if state.story_open and is_valid(state.home.MagicWordTooltipAnchor)then state.home.MagicWordTooltipAnchor:Close()end
 end
 
@@ -1219,7 +1465,15 @@ function pcl151762_mount_home_footer(state,outer,inside,section)
     row:SetRenderTranslation({X=0,Y=14})
     local row_fill=pcl151723_vadd(bar,row_area,0,0);row_fill:SetSize({Value=1,SizeRule=1})
     pcl151762_style_magic_words(state)
+    if state.download_bridge then
+        local button=pcl151762_outline_action(state,row,BMF_CREATIVE_AUTO_LOAD and 'Auto-load: On' or 'Auto-load: Off','home_auto_load',232)
+        local label_slot=state.action_visuals[button:GetAddress()].label.Slot
+        label_slot:SetHorizontalAlignment(0)
+        label_slot:SetPadding({Left=12,Top=0,Right=12,Bottom=0})
+        state.auto_load_button=button
+    end
     pcl151762_footer_move(state,state.home.DownloadButton,row,220,64)
+    mount_creative_conjure(state)
     pcl151762_footer_move(state,state.home.MagicWordTextBox,row,560,64)
     local spacer=pcl151723_new(state.home,'Spacer');pcl151723_hadd(row,spacer,true,0)
     pcl151762_footer_move(state,state.home.FilterText,row,320,64)
@@ -1405,7 +1659,7 @@ function pcl151762_update_action_hover(state)
         end
     end
     if state.download_face then
-        local button=is_valid(state.import_submit)and state.import_swap and state.import_submit or state.home.DownloadButton
+        local button=state.import_swap and state.import_submit or (state.conjure_swap and state.conjure_submit or state.home.DownloadButton)
         local opacity=button:IsHovered()and button:GetIsEnabled()and 1 or .55
         if state.download_face.hover_opacity~=opacity then state.download_face.label:SetRenderOpacity(opacity);state.download_face.hover_opacity=opacity end
     end
