@@ -1,5 +1,5 @@
-## Bladesong Mod Framework 0.1.16
+## Bladesong Mod Framework 0.1.17
 
-- Restores Preconstruction Library Parts Upload on Bladesong Main build 26433453.
-- Adds complete swords directly to the Creative Library when you use Conjure on a supported build. Turn on Auto-load to open the Forge after the sword is saved.
-- Adds the share icon to the top-right of Creative Library cards on Main build 26433453. Click it to generate and copy the sword's Magic Words.
+- Creative Library Multi-delete now saves and verifies a separate backup of each selected sword before deleting the batch.
+- Open **Multi-delete → Deleted swords** to restore individual swords, including blade-only builds.
+- The recovery list covers Creative swords deleted through Multi-delete after installing this update. Full-library safety backups are still kept.

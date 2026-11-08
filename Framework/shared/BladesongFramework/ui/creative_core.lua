@@ -1,6 +1,8 @@
 -- Framework-owned Creative menu implementation. Internal legacy names retain compatibility.
 PCL151762_HOME=nil
 PCL151762_IMPORT=nil
+local creative_archive=assert(loadfile(BMF_CREATIVE_ROOT..'ui/creative_archive.lua'))(BMF_CREATIVE_ROOT)
+local restore_page_size=16
 function pcl151762_text(value)
     if type(value)=='string' then return value end
     local ok,s=pcall(function()return value:ToString()end)
@@ -122,6 +124,7 @@ end
 function pcl151762_mode(state,mode)
     if mode~='delete'then state.last_library_view=mode end
     assert(not state.busy and not state.confirm and not PCL151762_IMPORT,'Finish the current operation first')
+    state.restore_open=nil
     if mode=='all'then state.view='all';state.page=1;state.form:SetVisibility(1);pcl151762_render(state);pcl151762_status(state,'');return end
     if mode~='delete'then
         assert(mode=='parts' or mode=='blades','Unknown library tab')
@@ -143,18 +146,33 @@ function pcl151762_input(state,open)
         else lib:SetInputMode_UIOnlyEx(player,open and state.panel or state.home,0,false)end
     end
 end
-function pcl151762_backup(state,gs)
-    local _,_,_,utils=pcl151762_context(state);gs:SaveGame()
+local function creative_save_candidates(state)
+    local _,_,_,utils=pcl151762_context(state)
     local paths=StaticFindObject('/Script/Engine.Default__BlueprintPathsLibrary')
     assert(is_valid(paths),'Save paths unavailable; nothing deleted')
     local profile=pcl151762_text(utils:GetCurrentProfileSavegameDir()):gsub('\\','/'):gsub('/$','')
     local saved=pcl151762_text(paths:ProjectSavedDir()):gsub('\\','/'):gsub('/$','')
-    local source
-    for _,name in ipairs({profile..'/CreativeMode.sav',saved..'/SaveGames/'..profile..'/CreativeMode.sav',saved..'/'..profile..'/CreativeMode.sav'})do
+    return {profile..'/CreativeMode.sav',saved..'/SaveGames/'..profile..'/CreativeMode.sav',saved..'/'..profile..'/CreativeMode.sav'}
+end
+local function creative_save_path(candidates)
+    for _,name in ipairs(candidates)do
         local file=io.open(name,'rb')
-        if file then local header=file:read(4);file:close();if header=='GVAS'then source=name;break end end
+        if file then local header=file:read(4);file:close();if header=='GVAS'then return name end end
     end
-    assert(source,'Creative save backup unavailable; nothing deleted')
+end
+local function creative_archive_path(state)
+    local candidates=creative_save_candidates(state)
+    local source=creative_save_path(candidates)
+    if source then return (source:gsub('CreativeMode%.sav$','BMF_DeletedSwords.jsonl'))end
+    for _,candidate in ipairs(candidates)do
+        local path=candidate:gsub('CreativeMode%.sav$','BMF_DeletedSwords.jsonl')
+        local file=io.open(path,'rb')
+        if file then file:close();return path end
+    end
+end
+function pcl151762_backup(state,gs)
+    gs:SaveGame()
+    local source=assert(creative_save_path(creative_save_candidates(state)),'Creative save backup unavailable; nothing deleted')
     local target=PCL151761_PARTS_DIR..'creative_before_delete_'..os.date('%Y%m%d_%H%M%S')..'_'..math.floor(os.clock()*1000)..'.sav'
     local input=assert(io.open(source,'rb'));local output=assert(io.open(target,'wb'));local total=0
     local ok,err=pcall(function()
@@ -174,14 +192,23 @@ function pcl151762_review_delete(state)
     local selected={};for _,item in ipairs(list)do if state.selected[item.id]then selected[#selected+1]=item end end
     assert(#selected>0,'Select at least one Creative sword')
     state.confirm={items=selected,fingerprint=fingerprint,gs=gs,collection=collection}
-    pcl151762_status(state,'Delete '..#selected..' selected Creative swords? A backup will be saved first.');pcl151762_controls(state)
+    pcl151762_status(state,'Delete '..#selected..' selected Creative swords? You can restore each one from Deleted swords.');pcl151762_controls(state)
 end
 function pcl151762_commit_delete(state)
     if PCL151762_SAVE_BACKUP then pcl151762_require_save_backup()end
     local request=assert(state.confirm,'Review the selected swords first')
-    local _,fingerprint,gs,collection=pcl151762_snapshot(state)
+    local inventory,fingerprint,gs,collection=pcl151762_snapshot(state)
     assert(fingerprint==request.fingerprint and gs:GetAddress()==request.gs:GetAddress() and collection:GetAddress()==request.collection:GetAddress(),'Inventory changed; nothing deleted')
-    request.backup=pcl151762_backup(state,gs);state.busy=true;state.confirm=nil;request.deleted=0;state.deleting=request;pcl151762_controls(state)
+    local services=bmf_creative_archive_services()
+    local ids={}
+    for _,item in ipairs(inventory)do
+        local ok,id=pcall(creative_archive.id,item.piece)
+        if ok then ids[id]=(ids[id] or 0)+1 end
+    end
+    for _,item in ipairs(request.items)do assert(ids[creative_archive.id(item.piece)]==1,'A selected sword has a duplicate ID; nothing deleted')end
+    request.backup=pcl151762_backup(state,gs)
+    local archive_path=assert(creative_archive_path(state),'Sword archive location unavailable; nothing deleted')
+    state.busy=true;state.confirm=nil;request.deleted=0;state.deleting=request;pcl151762_controls(state)
     local function finish(message)
         if is_valid(gs)then pcall(function()gs:SaveGame()end)end
         state.busy=false;state.deleting=nil;state.selected={}
@@ -204,11 +231,80 @@ function pcl151762_commit_delete(state)
             end
         end)
         if not ok then finish('Deleted '..request.deleted..' swords; stopped: '..tostring(err)..'. Backup kept.');return end
-        if request.deleted==#request.items then finish('Deleted '..request.deleted..' Creative swords. Backup saved.');return end
+        if request.deleted==#request.items then finish('Deleted '..request.deleted..' Creative swords. Restore them from Deleted swords.');return end
         pcl151762_status(state,'Deleting '..request.deleted..' / '..#request.items..' Creative swords...');pcl15179_schedule(33,step)
     end
-    pcl15179_schedule(1,step)
+    local archived=0
+    local function archive_step()
+        local ok,err=pcall(function()
+            local _,current_fingerprint,current_gs,current_collection=pcl151762_snapshot(state)
+            assert(current_fingerprint==request.fingerprint and current_gs:GetAddress()==gs:GetAddress() and
+                current_collection:GetAddress()==collection:GetAddress(),'Creative inventory changed')
+            creative_archive.store(archive_path,services,request.items[archived+1].piece)
+            archived=archived+1
+        end)
+        if not ok then finish('Nothing deleted. Sword archive failed: '..tostring(err));return end
+        if archived==#request.items then pcl15179_schedule(1,step);return end
+        pcl151762_status(state,'Backing up '..archived..' / '..#request.items..' Creative swords...')
+        pcl15179_schedule(16,archive_step)
+    end
+    pcl151762_status(state,'Backing up selected Creative swords...')
+    pcl15179_schedule(1,archive_step)
 end
+local function deleted_swords(state)
+    local inventory,_,gs,collection=pcl151762_snapshot(state)
+    local live={}
+    for _,item in ipairs(inventory)do
+        local ok,id=pcall(creative_archive.id,item.piece)
+        if ok then live[id]=true end
+    end
+    return creative_archive.available(creative_archive_path(state),live),gs,collection
+end
+
+local function render_deleted_swords(state)
+    local entries=deleted_swords(state)
+    state.restore_pages=math.max(1,math.ceil(#entries/restore_page_size))
+    state.restore_page=math.max(1,math.min(state.restore_page or 1,state.restore_pages))
+    pcl151762_forget_buttons(state.restore_buttons)
+    state.restore_buttons={}
+    state.restore_rows:ClearChildren()
+    if #entries==0 then
+        pcl151723_vadd(state.restore_rows,pcl151723_label(state.home,'No deleted Creative swords to restore.',24,false),12,0)
+    end
+    local start=(state.restore_page-1)*restore_page_size+1
+    for index=start,math.min(#entries,start+restore_page_size-1)do
+        local entry=entries[index]
+        local row=pcl151723_new(state.home,'HorizontalBox')
+        local name=entry.name~='' and entry.name or 'A Nameless Sword'
+        local count=tostring(entry.parts)..(entry.parts==1 and ' part' or ' parts')
+        local caption=name..'  |  '..count..'  |  '..os.date('%b %d, %Y %H:%M',entry.time)
+        pcl151723_hadd(row,pcl151723_label(state.home,caption,24,false),true,12)
+        local button=pcl151723_button(state.panel,'Restore sword',44)
+        pcl15171_bind_button(button,{kind='home_restore_sword',home_state=state,panel=state.panel,entry=entry})
+        state.restore_buttons[#state.restore_buttons+1]=button
+        pcl151723_hadd(row,button,false,0);pcl151723_vadd(state.restore_rows,row,6,6)
+    end
+    pcl151762_controls(state)
+end
+
+local function restore_deleted_sword(state,selected)
+    assert(state.restore_open and not state.busy,'Open Deleted swords first')
+    local entries,gs,collection=deleted_swords(state)
+    local entry
+    for _,candidate in ipairs(entries)do
+        if candidate.id==selected.id and candidate.slot==selected.slot then entry=candidate;break end
+    end
+    assert(entry,'This sword is already in your library or its archive changed')
+    local piece=creative_archive.load(bmf_creative_archive_services(),gs,entry)
+    local ok,err=pcall(function()collection:AddObject(piece);gs:SaveGame()end)
+    if not ok then
+        pcall(function()collection:RemoveObject(piece)end)
+        error('Could not save the restored sword: '..tostring(err),0)
+    end
+    render_deleted_swords(state)
+    pcl151762_status(state,'Restored '..(entry.name~='' and entry.name or 'sword')..' to Creative Library.')
+end
+
 function pcl151762_import_done(request,message)
     if PCL151762_IMPORT~=request then return end
     PCL151762_IMPORT=nil
@@ -547,6 +643,26 @@ function pcl151762_dispatch(action)
             return
         end
         if not state.open or state.busy then return end
+        if kind=='home_deleted_swords'then
+            assert(state.view=='delete' and not state.confirm,'Finish the current operation first')
+            if state.restore_open then
+                state.restore_open=nil;pcl151762_render(state);pcl151762_status(state,'')
+            else
+                state.restore_page=1;state.restore_open=true
+                local shown,why=pcall(render_deleted_swords,state)
+                if not shown then state.restore_open=nil;pcl151762_controls(state);error(why,0)end
+                pcl151762_status(state,'')
+            end
+            return
+        end
+        if state.restore_open then
+            if kind=='home_restore_sword'then restore_deleted_sword(state,action.entry)
+            elseif kind=='home_restore_previous' or kind=='home_restore_next'then
+                state.restore_page=state.restore_page+(kind=='home_restore_next' and 1 or -1)
+                render_deleted_swords(state)
+            end
+            return
+        end
         if kind=='home_all'or kind=='home_parts' or kind=='home_blades'then pcl151762_mode(state,kind=='home_all'and 'all'or(kind=='home_parts'and 'parts'or 'blades'))
         elseif kind=='home_copy'then
             pcl151726_slot(action.code);local args={#action.code};for i=1,#action.code do args[#args+1]=action.code:byte(i)end
@@ -864,10 +980,28 @@ function pcl151762_patch_cards(state)
 end
 function pcl151762_controls(state)
     local deleting=state.open and (state.view=='delete'or state.library_selecting);local locked=state.busy or state.confirm~=nil
+    local restoring=state.open and state.view=='delete' and state.restore_open
     local creative_busy=(PCL151762_IMPORT and PCL151762_IMPORT.mode=='creative') or state.share_request
     for _,button in ipairs({state.all,state.parts,state.blades})do pcl151762_action_visibility(state,button,state.open and not deleting and not state.story_open and 0 or 1);button:SetIsEnabled(not PCL151762_IMPORT and not locked)end
-    for _,button in ipairs({state.select_all,state.clear,state.remove})do pcl151762_action_visibility(state,button,deleting and 0 or 1);button:SetIsEnabled(not locked)end
+    for _,button in ipairs({state.select_all,state.clear,state.remove})do pcl151762_action_visibility(state,button,deleting and not restoring and 0 or 1);button:SetIsEnabled(not locked)end
     pcl151762_action_visibility(state,state.cancel_confirm,deleting and state.confirm and 0 or 1)
+    if is_valid(state.deleted_swords)then
+        pcl151762_action_visibility(state,state.deleted_swords,state.open and state.view=='delete' and not state.confirm and 0 or 1)
+        pcl151762_action_caption(state,state.deleted_swords,restoring and 'Back to multi-delete' or 'Deleted swords')
+        state.deleted_swords:SetIsEnabled(not locked)
+        pcl151762_action_visibility(state,state.restore_previous,restoring and state.restore_pages>1 and 0 or 1)
+        pcl151762_action_visibility(state,state.restore_next,restoring and state.restore_pages>1 and 0 or 1)
+        state.restore_previous:SetIsEnabled(restoring and state.restore_page>1 or false)
+        state.restore_next:SetIsEnabled(restoring and state.restore_page<state.restore_pages or false)
+    end
+    if is_valid(state.restore_panel)then
+        state.restore_panel:SetVisibility(restoring and 0 or 1)
+        if restoring and state.restore_content_visibility==nil then
+            state.restore_content_visibility=state.frame_content:GetVisibility();state.frame_content:SetVisibility(1)
+        elseif not restoring and state.restore_content_visibility~=nil then
+            state.frame_content:SetVisibility(state.restore_content_visibility);state.restore_content_visibility=nil
+        end
+    end
     if is_valid(state.tools)then state.tools:SetVisibility((state.open or (not state.story_open and is_valid(state.message) and state.message:GetVisibility()==0)) and 0 or 1)end
     local n=pcl151762_selected_count(state)
     pcl151762_action_caption(state,state.remove,state.confirm and ('Confirm delete '..n)or ('Delete selected ('..n..')'))
@@ -999,7 +1133,7 @@ function pcl151762_open(state,mode)
 end
 function pcl151762_close(state)
     if state.busy then return end
-    state.open=false;state.confirm=nil;state.library_selecting=nil;state.selected={};pcl151762_native_view(state,true);state.form:SetVisibility(1);pcl151762_controls(state);pcl151762_input(state,false)
+    state.open=false;state.confirm=nil;state.library_selecting=nil;state.restore_open=nil;state.selected={};pcl151762_native_view(state,true);state.form:SetVisibility(1);pcl151762_controls(state);pcl151762_input(state,false)
 end
 function pcl151762_create_home(home)
     local toolbar=pcl15171_create_widget(home,PCL15171_ENTRY_CLASS_OBJ);assert(is_valid(toolbar),'Creative toolbar unavailable')
@@ -1031,6 +1165,9 @@ function pcl151762_create_home(home)
     state.parts=pcl151762_outline_action(state,controls,'Parts','home_parts',180);state.blades=pcl151762_outline_action(state,controls,'Blades','home_blades',180)
     state.select_all=pcl151762_outline_action(state,controls,'Select all','home_select_all',210);state.clear=pcl151762_outline_action(state,controls,'Clear selection','home_clear',260)
     state.remove=pcl151762_outline_action(state,controls,'Delete selected (0)','home_delete',340);state.cancel_confirm=pcl151762_outline_action(state,controls,'Cancel review','home_cancel_confirm',260)
+    state.deleted_swords=pcl151762_outline_action(state,controls,'Deleted swords','home_deleted_swords',270)
+    state.restore_previous=pcl151762_outline_action(state,controls,'Previous','home_restore_previous',160)
+    state.restore_next=pcl151762_outline_action(state,controls,'Next','home_restore_next',160)
     local tools=pcl15171_create_widget(home,PCL15171_ENTRY_CLASS_OBJ);state.tools=tools
     local toolsroot=pcl15171_widget_by_name(tools,'PCL_EntryRoot');toolsroot:SetWidthOverride(1200);toolsroot:SetMaxDesiredWidth(1200)
     local toolsbody=pcl151723_new(home,'VerticalBox');toolsroot:SetContent(toolsbody)
@@ -1057,6 +1194,10 @@ end
 function pcl151762_cleanup_home()
     local state=PCL151762_HOME;if not state then return end
     PCL151762_HOME=nil
+    if state.restore_content_visibility~=nil and is_valid(state.frame_content)then
+        pcall(function()state.frame_content:SetVisibility(state.restore_content_visibility)end)
+    end
+    pcl151762_forget_buttons(state.restore_buttons)
     for _,entry in pairs(state.part_labels or {})do
         if entry and is_valid(entry.stack) and is_valid(entry.title)then
             pcall(pcl151762_replace_ordered,entry.stack,entry.title)
@@ -1253,6 +1394,9 @@ function pcl151762_mount_folder_tabs(state)
     local stack=pcl151723_new(state.home,'VerticalBox');frame:SetContent(stack)
     pcl151723_vadd(stack,state.tools,12,8)
     local content_slot=stack:AddChildToVerticalBox(state.frame_content);content_slot:SetSize({Value=1,SizeRule=1});content_slot:SetHorizontalAlignment(0)
+    state.restore_panel=pcl151723_new(state.home,'ScrollBox');state.restore_panel:SetVisibility(1)
+    state.restore_rows=pcl151723_new(state.home,'VerticalBox');state.restore_panel:AddChild(state.restore_rows)
+    local restore_slot=stack:AddChildToVerticalBox(state.restore_panel);restore_slot:SetSize({Value=1,SizeRule=1});restore_slot:SetHorizontalAlignment(0)
     pcl151762_mount_home_footer(state,overlay,stack,section)
     pcl151762_hide_story_sidebar(state)
     log('PCL15_17_62_FOLDER_TABS native_frame_attached=true frame='..safe_full_name(frame))
@@ -1449,11 +1593,11 @@ function pcl151762_move_magic_tip(state,fieldbox)
     fieldbox:SetContent(overlay)
 end
 function pcl151762_magic_footer_visibility(state)
-    for _,box in ipairs(state.magic_footer_boxes or {})do box:SetVisibility(state.story_open and 1 or 0)end
+    for _,box in ipairs(state.magic_footer_boxes or {})do box:SetVisibility((state.story_open or state.restore_open) and 1 or 0)end
     if is_valid(state.auto_load_button)then
         pcl151762_action_visibility(state,state.auto_load_button,(state.open or state.story_open) and 1 or 0)
     end
-    if state.story_open and is_valid(state.home.MagicWordTooltipAnchor)then state.home.MagicWordTooltipAnchor:Close()end
+    if (state.story_open or state.restore_open) and is_valid(state.home.MagicWordTooltipAnchor)then state.home.MagicWordTooltipAnchor:Close()end
 end
 
 function pcl151762_mount_home_footer(state,outer,inside,section)

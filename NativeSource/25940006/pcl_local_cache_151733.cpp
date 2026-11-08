@@ -16,13 +16,13 @@ static int cache_guard() {
     return 1;
 }
 extern "C" __declspec(dllexport) int pcl_cache_probe(void* L) {return result(L,cache_guard());}
-extern "C" __declspec(dllexport) int pcl_cache_store(void* L) {
+static int cache_store(void* L, bool creative) {
     u64 save=0,piece=0,saveclass=0,piececlass=0;
     if(!arg(L,1,save)||!arg(L,2,piece)||!arg(L,3,saveclass)||!arg(L,4,piececlass))return result(L,-1);
     int status=cache_guard();if(status!=1)return result(L,status);
     if(busy||!live(save)||!live(piece)||!live(saveclass)||!live(piececlass))return result(L,-7);
     if(rd<u64>(save+0x10)!=saveclass||rd<u64>(piece+0x10)!=piececlass ||
-       rd<u64>(save+0x30)||rd<u64>(save+0x38)||rd<u32>(piece+0xD0)<1 || rd<u32>(piece+0xD0)>6000)return result(L,-27);
+       rd<u64>(save+0x30)||rd<u64>(save+0x38)||(!creative&&(rd<u32>(piece+0xD0)<1 || rd<u32>(piece+0xD0)>6000)))return result(L,-27);
     busy=true;
     __try {
         // Engine TArray grow: element size, alignment, allocator, capacity.
@@ -37,7 +37,7 @@ extern "C" __declspec(dllexport) int pcl_cache_store(void* L) {
     } __except(1){status=-29;}
     busy=false;return result(L,status);
 }
-extern "C" __declspec(dllexport) int pcl_cache_restore(void* L) {
+static int cache_restore(void* L, bool creative) {
     u64 save=0,piece=0,saveclass=0,piececlass=0;
     if(!arg(L,1,save)||!arg(L,2,piece)||!arg(L,3,saveclass)||!arg(L,4,piececlass))return result(L,-1);
     int status=cache_guard();if(status!=1)return result(L,status);
@@ -46,7 +46,7 @@ extern "C" __declspec(dllexport) int pcl_cache_restore(void* L) {
     if(rd<u64>(save+0x10)!=saveclass||rd<u64>(piece+0x10)!=piececlass||
        rd<u32>(save+0x38)!=1||!ptr(data)||rd<u32>(piece+0xD0)!=0)return result(L,-30);
     u32 count=rd<u32>(data+0xA0);
-    if(count<1||count>6000||!ptr(rd<u64>(data+0x98)))return result(L,-31);
+    if((!creative&&(count<1||count>6000))||(count&&!ptr(rd<u64>(data+0x98))))return result(L,-31);
     busy=true;
     __try {
         u32 length=rd<u32>(data+0x180);
@@ -60,6 +60,14 @@ extern "C" __declspec(dllexport) int pcl_cache_restore(void* L) {
     } __except(1){status=-33;}
     busy=false;return result(L,status);
 }
+
+extern "C" __declspec(dllexport) int pcl_cache_store(void* L) {return cache_store(L,false);}
+extern "C" __declspec(dllexport) int pcl_cache_restore(void* L) {return cache_restore(L,false);}
+#ifndef PCL_BLADE_CACHE
+// Creative recovery keeps the whole sword, including blades with no attached parts.
+extern "C" __declspec(dllexport) int bmf_creative_archive_store(void* L) {return cache_store(L,true);}
+extern "C" __declspec(dllexport) int bmf_creative_archive_restore(void* L) {return cache_restore(L,true);}
+#endif
 extern "C" __declspec(dllexport) int pcl_cache_rebuild(void* L) {
     u64 host=0,piece=0,active=0,gm=0;
     if(!arg(L,1,host)||!arg(L,2,piece)||!arg(L,3,active)||!arg(L,4,gm))return result(L,-1);

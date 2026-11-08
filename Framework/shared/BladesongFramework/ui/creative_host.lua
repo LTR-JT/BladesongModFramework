@@ -38,6 +38,21 @@ E.bmf_creative_share_bridge=function()
  bridge.copy=copy
  return bridge
 end
+E.bmf_creative_archive_services=function()
+ local path,why=F.GetNativeHelper('pcl_local_cache_151733.dll')
+ assert(path,why)
+ local store=assert(package.loadlib(path,'bmf_creative_archive_store'),'Creative sword archive helper is unavailable')
+ local restore=assert(package.loadlib(path,'bmf_creative_archive_restore'),'Creative sword restore helper is unavailable')
+ local saveclass=StaticFindObject('/Script/Bladesong.CreativeModeSave')
+ local piececlass=StaticFindObject('/Script/Bladesong.Piece')
+ local statics=E.gameplay_statics_15()
+ assert(valid(saveclass) and valid(piececlass) and valid(statics),'Creative save services are unavailable')
+ return {
+  bridge={store=store,restore=restore},statics=statics,saveclass=saveclass,piececlass=piececlass,valid=valid,
+  text=E.pcl151762_text,to_text=E.pcl15171_to_text,
+  construct=function(class,owner)local piece=StaticConstructObject(class,owner);E.pcl151731_fresh(piece);return piece end,
+ }
+end
 if not options.provider then
  E.is_valid=valid
  E.log=function(message)print('[BMF Creative] '..tostring(message)..'\n')end

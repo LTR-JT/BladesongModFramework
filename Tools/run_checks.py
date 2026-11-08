@@ -14,7 +14,7 @@ with __import__('tempfile').TemporaryDirectory(dir=ROOT/'Tests')as temp:
  syntax=Path(temp)/'syntax.lua'
  syntax.write_text('\n'.join('assert(loadfile('+__import__('json').dumps(str(f).replace('\\','/'))+'))'for f in files)+"\nprint('PASS: all runtime/template Lua syntax')\n",encoding='utf-8')
  run(lua,syntax)
-for fixture in ['runtime_independence.lua','core.lua','compatibility.lua','creative_ownership.lua','creative_performance.lua','preservation.lua']:run(lua,ROOT/'Tests'/fixture)
+for fixture in ['runtime_independence.lua','core.lua','compatibility.lua','creative_ownership.lua','creative_performance.lua','creative_archive.lua','preservation.lua']:run(lua,ROOT/'Tests'/fixture)
 if os.name=='nt':
  run(sys.executable,ROOT/'Tools/build_local_service.py')
  for fixture in ['local_service_test.py']:run(sys.executable,ROOT/'Tests'/fixture)
