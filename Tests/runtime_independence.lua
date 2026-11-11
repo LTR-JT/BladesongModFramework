@@ -9,6 +9,8 @@ function F._set(k,v)state[k]=v end
 function F.BindMod(id)assert(id=='BladesongModFramework')end
 function F._applyCompatibility()return{id='fixture',status='verified'}end
 function F.Poll()end
+function F.GetSettings(id)assert(id=='BladesongModFramework');return{}end
+function F._valid(object)return type(object)=="table" end
 local native_load=loadfile
 function env.loadfile(path,...)
  assert(not path:find('BladesongModManager',1,true)and not path:find('manager.lua',1,true),'Runtime imported manager')
@@ -18,11 +20,15 @@ function env.loadfile(path,...)
   callback({identity={sha256='fixture',branch='unknown'},status='complete'})
  end,Poll=function()end}end end
  if path:match('creative_host.lua$')then return function()return{Tick=function()end}end end
+ if path:match('forge_controls.lua$')then return native_load(path,'t',env)end
  return native_load(path,...)
 end
 function env.ExecuteInGameThreadWithDelay(_,callback)env.tick=callback end
+function env.RegisterHook(path)assert(path=='/Script/CommonUI.CommonButtonBase:HandleButtonClicked');env.forge_hook_registered=true end
+function env.StaticFindObject()return nil end
+function env.FindFirstOf()return nil end
 assert(native_load(repo..'/Framework/BladesongModFramework/Scripts/main.lua','t',env))()
-assert(env.BMF_MANAGER==nil and state.status:find('"ready":true',1,true))
+assert(env.BMF_MANAGER==nil and env.forge_hook_registered and state.status:find('"ready":true',1,true))
 env.tick();assert(operations[1]=='identify'and operations[2]=='settings')
 local manifest=io.open(repo..'/../PreconstructionLibrary/mod.json','rb');if manifest then local m=F._json.decode(manifest:read('*a'));manifest:close();assert(m.dependencies.BladesongModFramework and not m.dependencies.BladesongModManager)end
 print('PASS: mocked framework lifecycle and PCL metadata require no manager; no network or deployment operation in runtime startup')
