@@ -1,4 +1,4 @@
--- Bladesong Mod Framework 0.1.17. All UObject access stays on the game thread.
+-- Bladesong Mod Framework 0.1.18. All UObject access stays on the game thread.
 if BMF_RUNTIME_STARTED then return end
 BMF_RUNTIME_STARTED=true
 BMF_ROOT=debug.getinfo(1,'S').source:gsub('^@',''):match('^(.*[\\/])')..'../../shared/BladesongFramework/'
@@ -11,6 +11,7 @@ BMF.BindMod('BladesongModFramework')
 BMF_WORKER=assert(loadfile(BMF_ROOT..'worker_client.lua'))(BMF_ROOT,BMF)
 BMF.StartJob=BMF_WORKER.StartJob
 BMF_CREATIVE=assert(loadfile(BMF_ROOT..'ui/creative_host.lua'))(BMF,BMF_ROOT)
+local forgeControls=assert(loadfile(BMF_ROOT..'ui/forge_controls.lua'))(BMF)
 BMF.StartJob('identify',{},function(result)
  if result.identity then
   local status=result.identity;status.ready=true;status.profile=nil
@@ -20,7 +21,7 @@ end)
 function BMF_RuntimeTick()
  if BMF._get('epoch')~=BMF_GENERATION then return end
  local ok,err=pcall(function()
-  BMF.Poll();BMF_WORKER.Poll();BMF_CREATIVE.Tick()
+  BMF.Poll();BMF_WORKER.Poll();forgeControls.Tick();BMF_CREATIVE.Tick()
   local settings=BMF._get('settings')or '{}'
   if settings~=BMF_SAVED_SETTINGS and not BMF_SETTINGS_PENDING and os.time()>=(BMF_SETTINGS_RETRY or 0) then
    local payload=BMF._json.decode(settings)
@@ -40,4 +41,4 @@ function BMF_RuntimeTick()
  ExecuteInGameThreadWithDelay(500,BMF_RuntimeTick)
 end
 ExecuteInGameThreadWithDelay(500,BMF_RuntimeTick)
-print('[BMF] Framework 0.1.17 initialized; API 1.0.0; branch identity is unknown until verified.\n')
+print('[BMF] Framework 0.1.18 initialized; API 1.0.0; branch identity is unknown until verified.\n')
