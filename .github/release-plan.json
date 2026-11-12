@@ -1,5 +1,5 @@
 {
   "publish": true,
-  "version": "0.1.18",
-  "reason": "Publish the Forge catalogue controls after validating startup with the UE4SS fixture"
+  "version": "0.1.19",
+  "reason": "Publish the Bleeding Edge Forge layout adjustments"
 }

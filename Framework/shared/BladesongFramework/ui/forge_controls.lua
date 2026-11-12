@@ -331,6 +331,10 @@ local function refreshForge(hidden)
     end
     local state = forgeState
     refreshTang(state, hidden)
+    if framework.GetGameBranch() == 'bleedingedge' then
+        if valid(state.face) or valid(state.lip) then clearCatalogue(state) end
+        return
+    end
     if valid(state.button) and (not valid(state.panel) or not valid(state.lip)) then
         clearCatalogue(state)
     end

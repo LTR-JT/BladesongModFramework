@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "id": "bleedingedge-26590439",
+  "branch": "bleedingedge",
+  "buildid": "26590439",
+  "sha256": "a5a26d2fbce13ffe87c9ca5cdcc8359c13d517433ad54ef636a54af75ec52aef",
+  "status": "Bleeding Edge 26590439 identified; reflected capability probes available while native helpers are being verified.",
+  "overrides": {},
+  "legacy_pcl_native_verified": false,
+  "native_helpers": {}
+}

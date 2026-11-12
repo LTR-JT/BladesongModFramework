@@ -1,6 +1,7 @@
 -- Framework-owned JSON patch packs are selected by executable hash, never branch alone.
 local root,J=...
 local index={
+ ['a5a26d2fbce13ffe87c9ca5cdcc8359c13d517433ad54ef636a54af75ec52aef']='bleedingedge-26590439.json',
  ['a64202ae9a2f62d4e50e53f4b3f5a9df525dfcd0f1d1230531ed600c434268d0']='main-26433453.json',
  ['0928484ccb4accf4a4bf7fa51e438a70ba92b08556d502631cfb3f8c9fa86985']='main-26400894-anchor-test.json',
  ['de710959ec9959eef9904ac4dee3763d94e92994e9b28e63baa5b50bae8993d5']='main-25431485.json',
